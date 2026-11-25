@@ -103,3 +103,9 @@ DAN PASTIKAN UNTUK SEMUA PERSYARATAN DI @"Home_Test/AI-Native Software Engineer 
 ```text
 untuk yang csv aku aja nanti upload manual gitu terus jalanin yang log prompt
 ```
+
+## 17. Prompt · 25 Nov 2026 15:59 WIB
+
+```text
+jadi nanti pas appnya jalan udh di deploya aku upload aja csvnya ga ush taro datanya di repo
+```
