@@ -3,7 +3,7 @@
 Web app sederhana yang mengubah file ekspor pesanan dari **Shopee, TikTok Shop dan Tokopedia** menjadi angka penjualan
 yang bisa dipercaya: net revenue per channel, net revenue per produk, dan 10 produk teratas, dengan filter tanggal.
 
-**Link live:** _(isi dengan URL Vercel)_
+**Link live:** https://lekreys.github.io/biota-sales-dashboard/
 
 ## Angka akhir (Oktober 2026)
 
@@ -59,8 +59,9 @@ npm run verify   # cek angka dengan skrip Python terpisah (butuh python3)
 npm run build    # build untuk produksi (folder dist/)
 ```
 
-Deploy: import repo ini di [vercel.com](https://vercel.com). Vercel otomatis mengenali Vite
-(build `npm run build`, output `dist`).
+**Deploy:** setiap push ke branch `main` otomatis menjalankan semua test, lalu mem-publish aplikasi ke GitHub Pages
+(lihat `.github/workflows/deploy.yml`). Kalau ada test yang gagal, versi baru tidak di-publish. Build yang sama juga
+bisa di-import ke Vercel atau Netlify tanpa perubahan (build `npm run build`, output `dist`).
 
 ## Keputusan dan asumsi tentang data
 
@@ -151,7 +152,7 @@ Deploy: import repo ini di [vercel.com](https://vercel.com). Vercel otomatis men
   lewat pemetaan kolom yang bisa diatur.
 - Menghitung net revenue setelah biaya marketplace, voucher dan ongkir, kalau data tersebut tersedia di ekspor.
 - Perbandingan antar bulan dan grafik tren harian.
-- Test end-to-end otomatis di CI untuk alur upload dan filter.
+- Test end-to-end otomatis untuk alur upload dan filter (unit test dan test angka sudah berjalan di setiap push).
 
 ## Tools dan model AI
 
