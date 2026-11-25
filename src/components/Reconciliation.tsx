@@ -43,9 +43,9 @@ export function Reconciliation({ cleaned, summary }: { cleaned: CleanResult; sum
         </div>
 
         <div>
-          <h3>Periode terpilih</h3>
+          <h3>Sesuai filter</h3>
           <dl className="facts">
-            <dt>Baris dalam periode</dt>
+            <dt>Baris sesuai filter</dt>
             <dd>{formatNumber(summary.linesInRange)}</dd>
             <dt>Dihitung (selesai / dikirim)</dt>
             <dd className="strong">

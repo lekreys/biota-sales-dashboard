@@ -19,3 +19,21 @@ export function endOfMonth(day: string): string {
 }
 
 export const monthName = (day: string) => MONTHS_ID[Number(day.slice(5, 7)) - 1];
+
+const WEEKDAYS_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+/** "2026-10-15" -> "Kam, 15 Okt 2026". */
+export function formatDayLong(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return `${WEEKDAYS_ID[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${formatDay(day)}`;
+}
+
+const compact = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 });
+
+/** Short form for chart axes: 0, 500 rb, 10 jt, 1,5 M. */
+export function formatCompact(n: number): string {
+  if (n >= 1e9) return `${compact.format(n / 1e9)} M`;
+  if (n >= 1e6) return `${compact.format(n / 1e6)} jt`;
+  if (n >= 1e3) return `${compact.format(n / 1e3)} rb`;
+  return compact.format(n);
+}

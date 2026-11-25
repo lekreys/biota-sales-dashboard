@@ -1,20 +1,49 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChannelSection } from './components/ChannelSection';
-import { DateFilter } from './components/DateFilter';
-import { ProductSection } from './components/ProductSection';
+import { FilterBar } from './components/FilterBar';
+import { KpiRow } from './components/KpiRow';
+import { ProductTable } from './components/ProductTable';
 import { Reconciliation } from './components/Reconciliation';
+import { TopProducts } from './components/TopProducts';
+import { TrendChart } from './components/TrendChart';
 import { UploadArea } from './components/UploadArea';
 import { cleanRows } from './lib/clean';
 import { readCsv, toCsv } from './lib/csv';
-import { formatDay, formatNumber, formatRupiah } from './lib/format';
-import { filterByDate, summarize } from './lib/metrics';
-import type { SourceFile } from './lib/types';
+import { formatDay } from './lib/format';
+import { applyFilters, dailyRevenue, NO_FILTERS, summarize } from './lib/metrics';
+import type { Filters } from './lib/metrics';
+import { CHANNELS } from './lib/types';
+import type { Channel, SourceFile } from './lib/types';
+
+type Theme = 'light' | 'dark' | null; // null = follow the operating system
+
+function storedTheme(): Theme {
+  try {
+    const t = localStorage.getItem('theme');
+    return t === 'light' || t === 'dark' ? t : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function App() {
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [theme, setTheme] = useState<Theme>(storedTheme);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme) root.dataset.theme = theme;
+    else delete root.dataset.theme;
+    try {
+      if (theme) localStorage.setItem('theme', theme);
+      else localStorage.removeItem('theme');
+    } catch {
+      // storage unavailable (private mode): the toggle still works for this visit
+    }
+  }, [theme]);
+  const isDark = theme === 'dark' || (theme === null && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
 
   const cleaned = useMemo(() => (files.length ? cleanRows(files) : null), [files]);
   const bounds = useMemo(() => {
@@ -22,12 +51,22 @@ export default function App() {
     const days = cleaned.rows.map((r) => r.day).sort();
     return { min: days[0], max: days[days.length - 1] };
   }, [cleaned]);
-  const invalidRange = Boolean(from && to && from > to);
-  const inRange = useMemo(
-    () => (cleaned && !invalidRange ? filterByDate(cleaned.rows, from, to) : []),
-    [cleaned, from, to, invalidRange],
-  );
-  const summary = useMemo(() => (cleaned ? summarize(inRange, cleaned.productNames) : null), [cleaned, inRange]);
+  const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
+
+  // Every panel uses the same filters. Some ignore one filter so they keep their context (see applyFilters).
+  const view = useMemo(() => {
+    if (!cleaned || !bounds) return null;
+    const rows = invalidRange ? [] : cleaned.rows;
+    const names = cleaned.productNames;
+    const filtered = applyFilters(rows, filters);
+    return {
+      rows: filtered,
+      summary: summarize(filtered, names),
+      channels: summarize(applyFilters(rows, filters, { channel: true }), names).byChannel,
+      products: summarize(applyFilters(rows, filters, { product: true }), names).byProduct,
+      daily: dailyRevenue(applyFilters(cleaned.rows, filters, { date: true }), bounds.min, bounds.max),
+    };
+  }, [cleaned, bounds, filters, invalidRange]);
 
   async function addFiles(list: { name: string; text: () => Promise<string> }[]) {
     const added: SourceFile[] = [];
@@ -57,78 +96,102 @@ export default function App() {
   function reset() {
     setFiles([]);
     setErrors([]);
-    setFrom('');
-    setTo('');
+    setFilters(NO_FILTERS);
   }
 
+  const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
+  const soloChannel = (c: Channel) =>
+    setFilters((f) => ({ ...f, channels: f.channels.length === 1 && f.channels[0] === c ? [...CHANNELS] : [c] }));
+  const toggleProduct = (key: string) => setFilters((f) => ({ ...f, product: f.product === key ? null : key }));
+
+  const productName = filters.product && cleaned ? (cleaned.productNames[filters.product] ?? filters.product) : null;
+  const periodLabel = bounds ? `${formatDay(filters.from || bounds.min)} – ${formatDay(filters.to || bounds.max)}` : '';
+  const scopeLabel = [
+    filters.channels.length < CHANNELS.length ? filters.channels.join(' + ') : '',
+    productName ?? '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   function download() {
-    const blob = new Blob([toCsv(inRange)], { type: 'text/csv;charset=utf-8' });
+    if (!view) return;
+    const blob = new Blob([toCsv(view.rows)], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `data_bersih_${from || bounds?.min}_sd_${to || bounds?.max}.csv`;
+    a.download = `data_bersih_${filters.from || bounds?.min}_sd_${filters.to || bounds?.max}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  const periodLabel = bounds
-    ? `${formatDay(from || bounds.min)} – ${formatDay(to || bounds.max)}`
-    : '';
-
   return (
     <div className="page">
       <header className="header">
-        <h1>Dashboard Penjualan</h1>
-        <p className="muted">BIOTA Smart Home · Shopee, TikTok Shop dan Tokopedia</p>
+        <div>
+          <p className="eyebrow">BIOTA Smart Home</p>
+          <h1>Dashboard Penjualan</h1>
+          <p className="secondary">
+            Shopee, TikTok Shop dan Tokopedia
+            {bounds && ` · ${formatDay(bounds.min)} – ${formatDay(bounds.max)}`}
+          </p>
+        </div>
+        <button
+          className="icon-button"
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          aria-label={isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
+          title={isDark ? 'Mode terang' : 'Mode gelap'}
+        >
+          {isDark ? '☀' : '☾'}
+        </button>
       </header>
 
-      <UploadArea
-        files={files}
-        errors={errors}
-        onFiles={addFiles}
-        onSample={loadSample}
-        onReset={reset}
-      />
+      <UploadArea files={files} errors={errors} onFiles={addFiles} onSample={loadSample} onReset={reset} />
 
-      {cleaned && bounds && summary && (
+      {cleaned && bounds && view && (
         <>
-          <DateFilter
-            from={from}
-            to={to}
+          <FilterBar
+            filters={filters}
             min={bounds.min}
             max={bounds.max}
             invalid={invalidRange}
-            onChange={(f, t) => {
-              setFrom(f);
-              setTo(t);
-            }}
+            productName={productName}
+            onChange={update}
+            onReset={() => setFilters(NO_FILTERS)}
           />
 
-          <section className="card hero">
-            <div>
-              <p className="label">Total net revenue</p>
-              <p className="hero-value">{formatRupiah(summary.netRevenue)}</p>
-              <p className="muted">
-                {periodLabel} · {formatNumber(summary.orders)} pesanan · {formatNumber(summary.units)} unit
-              </p>
-            </div>
-            <button className="button secondary" onClick={download} disabled={inRange.length === 0}>
-              Unduh data bersih (CSV)
-            </button>
-          </section>
+          <KpiRow
+            summary={view.summary}
+            periodLabel={periodLabel}
+            scopeLabel={scopeLabel}
+            onDownload={download}
+            canDownload={view.rows.length > 0}
+          />
+
+          <TrendChart
+            points={view.daily}
+            from={filters.from}
+            to={filters.to}
+            channels={filters.channels}
+            onSelect={(from, to) => update({ from, to })}
+          />
 
           <div className="grid">
-            <ChannelSection summary={summary} />
-            <ProductSection title="Top 10 produk" products={summary.byProduct.slice(0, 10)} total={summary.netRevenue} ranked />
+            <ChannelSection channels={view.channels} selected={filters.channels} onSolo={soloChannel} />
+            <TopProducts
+              products={view.products}
+              channels={filters.channels}
+              selected={filters.product}
+              onSelect={toggleProduct}
+            />
           </div>
 
-          <ProductSection title="Net revenue per produk" products={summary.byProduct} total={summary.netRevenue} />
+          <ProductTable products={view.products} selected={filters.product} onSelect={toggleProduct} />
 
-          <Reconciliation cleaned={cleaned} summary={summary} />
+          <Reconciliation cleaned={cleaned} summary={view.summary} />
         </>
       )}
 
-      <footer className="footer muted">
+      <footer className="footer secondary">
         Net revenue = total harga dari pesanan yang tidak dibatalkan dan tidak diretur/refund. Pesanan yang sudah selesai
         maupun yang masih dalam pengiriman tetap dihitung. Semua data diproses di browser kamu dan tidak dikirim ke
         server.

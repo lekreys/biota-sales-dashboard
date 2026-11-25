@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterByDate, summarize } from './metrics';
+import { applyFilters, dailyRevenue, daysBetween, filterByDate, NO_FILTERS, summarize } from './metrics';
 import type { CleanRow } from './types';
 
 function line(overrides: Partial<CleanRow> = {}): CleanRow {
@@ -73,5 +73,59 @@ describe('summarize', () => {
     expect(summary.excluded.cancelled).toEqual({ lines: 1, value: 999 });
     expect(summary.excluded.returned).toEqual({ lines: 1, value: 777 });
     expect(summary.excluded.unknown).toEqual({ lines: 0, value: 0 });
+  });
+
+  it('splits each product by channel, adding up to its net revenue', () => {
+    const a = summary.byProduct.find((p) => p.sku === 'A')!;
+    expect(a.byChannel).toEqual({ Shopee: 200, 'TikTok Shop': 0, Tokopedia: 100 });
+  });
+});
+
+describe('applyFilters', () => {
+  const rows = [
+    line({ day: '2026-10-01', channel: 'Shopee', sku: 'A' }),
+    line({ day: '2026-10-10', channel: 'Tokopedia', sku: 'B' }),
+    line({ day: '2026-10-20', channel: 'TikTok Shop', sku: '', productName: 'Tanpa SKU' }),
+  ];
+
+  it('keeps everything with no filters', () => {
+    expect(applyFilters(rows, NO_FILTERS)).toHaveLength(3);
+  });
+
+  it('combines date, channel and product filters', () => {
+    expect(applyFilters(rows, { ...NO_FILTERS, from: '2026-10-05' })).toHaveLength(2);
+    expect(applyFilters(rows, { ...NO_FILTERS, channels: ['Shopee', 'Tokopedia'] })).toHaveLength(2);
+    expect(applyFilters(rows, { ...NO_FILTERS, product: 'B' }).map((r) => r.sku)).toEqual(['B']);
+    expect(applyFilters(rows, { ...NO_FILTERS, product: 'TANPA SKU: Tanpa SKU' })).toHaveLength(1);
+    expect(applyFilters(rows, { ...NO_FILTERS, from: '2026-10-05', channels: ['Shopee'] })).toHaveLength(0);
+  });
+
+  it('can ignore one filter so a panel keeps its context', () => {
+    const f = { ...NO_FILTERS, from: '2026-10-05', channels: ['Shopee' as const] };
+    expect(applyFilters(rows, f, { channel: true })).toHaveLength(2);
+    expect(applyFilters(rows, f, { date: true })).toHaveLength(1);
+  });
+});
+
+describe('dailyRevenue', () => {
+  it('lists every day, including days without sales, and counts only counted lines', () => {
+    const rows = [
+      line({ day: '2026-10-01', channel: 'Shopee', totalPrice: 100 }),
+      line({ day: '2026-10-01', channel: 'Tokopedia', totalPrice: 50 }),
+      line({ day: '2026-10-03', channel: 'Shopee', totalPrice: 70 }),
+      line({ day: '2026-10-03', totalPrice: 999, status: 'cancelled' }),
+      line({ day: '2026-11-01', totalPrice: 5 }), // outside the range
+    ];
+    const days = dailyRevenue(rows, '2026-10-01', '2026-10-03');
+    expect(days.map((d) => [d.day, d.total])).toEqual([
+      ['2026-10-01', 150],
+      ['2026-10-02', 0],
+      ['2026-10-03', 70],
+    ]);
+    expect(days[0].byChannel).toEqual({ Shopee: 100, 'TikTok Shop': 0, Tokopedia: 50 });
+  });
+
+  it('walks across month ends', () => {
+    expect(daysBetween('2026-10-30', '2026-11-02')).toEqual(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02']);
   });
 });

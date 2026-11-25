@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cleanRows } from './clean';
 import { readCsv } from './csv';
-import { filterByDate, summarize } from './metrics';
+import { applyFilters, dailyRevenue, filterByDate, NO_FILTERS, summarize } from './metrics';
 
 const text = readFileSync(resolve(__dirname, '../../data/biota_orders_oct2026.csv'), 'utf-8');
 const csv = readCsv(text);
@@ -75,6 +75,20 @@ describe('October 2026 export', () => {
       ['BIO-SD-V128', 10_971_000, 69],
       ['BIO-PET-WF', 10_773_000, 27],
     ]);
+  });
+
+  it('the daily chart adds up to the same totals', () => {
+    const days = dailyRevenue(result.rows, '2026-10-01', '2026-10-31');
+    expect(days).toHaveLength(31);
+    expect(days.reduce((a, d) => a + d.total, 0)).toBe(298_937_000);
+    expect(days.slice(0, 15).reduce((a, d) => a + d.total, 0)).toBe(146_226_000);
+  });
+
+  it('the channel and product filters give the same numbers as the tables', () => {
+    const shopee = applyFilters(result.rows, { ...NO_FILTERS, channels: ['Shopee'] });
+    expect(summarize(shopee, result.productNames).netRevenue).toBe(180_315_000);
+    const camera = applyFilters(result.rows, { ...NO_FILTERS, product: 'BIO-CAM-BF' });
+    expect(summarize(camera, result.productNames).netRevenue).toBe(60_445_000);
   });
 
   it('every line is either counted or excluded for a known reason', () => {

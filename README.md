@@ -41,9 +41,18 @@ Nama produk berbeda di tiap marketplace; yang ditampilkan adalah nama listing te
 1. Buka link live di atas.
 2. Tarik file CSV ke kotak upload, atau klik **Pilih file CSV**. Bisa satu file gabungan atau beberapa file sekaligus
    (misalnya satu file per marketplace). Untuk mencoba cepat, klik **Pakai data contoh (Okt 2026)**.
-3. Pilih periode dengan tombol **1–15 Okt** / **16–31 Okt**, atau isi tanggal sendiri. Kedua tanggal ikut dihitung.
+3. Jelajahi angkanya. Semua bagian dashboard mengikuti filter yang sama:
+   - **Periode:** tombol **1–15 Okt** / **16–31 Okt**, isi tanggal sendiri, atau **geser (drag) di grafik harian**
+     untuk memilih rentang. Klik satu batang untuk melihat satu hari, lalu klik lagi untuk kembali. Kedua tanggal
+     ikut dihitung.
+   - **Channel:** klik channel di kartu "Net revenue per channel" untuk melihat channel itu saja, atau
+     nyalakan/matikan channel di baris filter.
+   - **Produk:** klik produk di Top 10 atau di tabel produk untuk melihat penjualan produk itu saja. Tabel produk
+     bisa dicari dan diurutkan.
+   - Arahkan kursor ke grafik untuk melihat rincian per channel. Setiap grafik juga punya versi tabel.
+   - Tombol ☾ / ☀ di kanan atas mengganti mode gelap / terang.
 4. Di bagian bawah, **Dari file ke angka** menunjukkan apa saja yang dibersihkan dan dikecualikan, supaya angkanya
-   bisa dicek ulang. Tombol **Unduh data bersih** menyimpan data yang sudah dibersihkan sebagai CSV.
+   bisa dicek ulang. Tombol **Unduh data bersih** menyimpan data yang sudah dibersihkan sesuai filter sebagai CSV.
 
 Semua proses terjadi di browser. File tidak dikirim ke server mana pun.
 
@@ -129,6 +138,10 @@ bisa di-import ke Vercel atau Netlify tanpa perubahan (build `npm run build`, ou
    "Dikomplain - Retur" dihitung), dan setiap kali test langsung gagal.
 5. **Cek di browser:** angka yang tampil di layar dicocokkan dengan test untuk "Semua", "1–15" dan "16–31", termasuk
    upload file yang sama dua kali, file berkolom salah, file .xlsx, dan tampilan di lebar HP.
+6. **Fitur interaktif memakai hitungan yang sama.** Grafik harian, filter channel dan filter produk dihitung oleh
+   fungsi yang sama dengan tabel. Test memastikan total harian = total bulan (Rp 298.937.000), Shopee saja =
+   Rp 180.315.000, dan satu produk = angka di tabel produk. Angka per hari di tooltip juga dicocokkan dengan skrip
+   Python (misalnya 10 Okt: Rp 6.650.000).
 
 ## Tiga hal yang salah dikerjakan AI
 
@@ -151,7 +164,7 @@ bisa di-import ke Vercel atau Netlify tanpa perubahan (build `npm run build`, ou
 - Mendukung lebih banyak format ekspor (misalnya jam dengan AM/PM, atau kolom dengan nama berbeda per marketplace)
   lewat pemetaan kolom yang bisa diatur.
 - Menghitung net revenue setelah biaya marketplace, voucher dan ongkir, kalau data tersebut tersedia di ekspor.
-- Perbandingan antar bulan dan grafik tren harian.
+- Perbandingan antar bulan.
 - Test end-to-end otomatis untuk alur upload dan filter (unit test dan test angka sudah berjalan di setiap push).
 
 ## Tools dan model AI
@@ -169,9 +182,10 @@ Log prompt lengkap ada di folder `prompt-log/` (ekspor apa adanya dari Claude Co
 ```
 src/lib/parse.ts      Membaca harga, tanggal, channel dan status
 src/lib/clean.ts      Menggabungkan file, memulihkan SKU, membuang duplikat
-src/lib/metrics.ts    Filter tanggal dan hitungan net revenue
+src/lib/metrics.ts    Filter (tanggal, channel, produk), hitungan net revenue, data harian
 src/lib/csv.ts        Membaca CSV dan membuat CSV data bersih
-src/components/       Tampilan dashboard
+src/components/       Tampilan dashboard (filter, angka utama, grafik, tabel, rekonsiliasi)
+src/hooks/            Animasi angka
 scripts/verify_numbers.py   Hitungan kedua (Python) untuk cek silang
 data/                 File ekspor Oktober 2026
 ```

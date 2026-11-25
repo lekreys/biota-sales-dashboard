@@ -2,9 +2,41 @@ import { productKey } from './clean';
 import { CHANNELS } from './types';
 import type { Channel, CleanRow, StatusCategory } from './types';
 
+export interface Filters {
+  from: string; // YYYY-MM-DD, '' = no limit
+  to: string; // YYYY-MM-DD, '' = no limit
+  channels: Channel[]; // selected channels; all three = no channel filter
+  product: string | null; // product key (see productKey), null = all products
+}
+
+export const NO_FILTERS: Filters = { from: '', to: '', channels: [...CHANNELS], product: null };
+
 /** Inclusive date filter on calendar days ("YYYY-MM-DD"). Empty bound = no limit. */
 export function filterByDate(rows: CleanRow[], from: string, to: string): CleanRow[] {
-  return rows.filter((r) => (!from || r.day >= from) && (!to || r.day <= to));
+  return rows.filter((r) => inDateRange(r, from, to));
+}
+
+function inDateRange(r: CleanRow, from: string, to: string): boolean {
+  return (!from || r.day >= from) && (!to || r.day <= to);
+}
+
+/**
+ * Applies the dashboard filters. `ignore` lets a panel keep its own context visible:
+ * the channel panel ignores the channel filter (unselected channels are shown dimmed),
+ * the trend chart ignores the date filter (the selected range is highlighted on the full period),
+ * the product tables ignore the product filter (the selected product is highlighted).
+ */
+export function applyFilters(
+  rows: CleanRow[],
+  f: Filters,
+  ignore: { date?: boolean; channel?: boolean; product?: boolean } = {},
+): CleanRow[] {
+  return rows.filter(
+    (r) =>
+      (ignore.date || inDateRange(r, f.from, f.to)) &&
+      (ignore.channel || f.channels.includes(r.channel)) &&
+      (ignore.product || f.product === null || productKey(r) === f.product),
+  );
 }
 
 export interface ChannelSummary {
@@ -20,6 +52,7 @@ export interface ProductSummary {
   name: string;
   netRevenue: number;
   units: number;
+  byChannel: Record<Channel, number>;
 }
 
 export interface StatusSummary {
@@ -41,6 +74,7 @@ export interface Summary {
 }
 
 const orderKey = (r: CleanRow) => `${r.channel}|${r.orderId}`;
+const emptyByChannel = (): Record<Channel, number> => ({ Shopee: 0, 'TikTok Shop': 0, Tokopedia: 0 });
 
 /** Net revenue = sum of total_price over lines whose status is "counted". */
 export function summarize(rows: CleanRow[], productNames: Record<string, string>): Summary {
@@ -59,9 +93,17 @@ export function summarize(rows: CleanRow[], productNames: Record<string, string>
   const products = new Map<string, ProductSummary>();
   for (const r of counted) {
     const key = productKey(r);
-    const p = products.get(key) ?? { key, sku: r.sku, name: productNames[key] ?? r.productName, netRevenue: 0, units: 0 };
+    const p = products.get(key) ?? {
+      key,
+      sku: r.sku,
+      name: productNames[key] ?? r.productName,
+      netRevenue: 0,
+      units: 0,
+      byChannel: emptyByChannel(),
+    };
     p.netRevenue += r.totalPrice;
     p.units += r.qty;
+    p.byChannel[r.channel] += r.totalPrice;
     products.set(key, p);
   }
   const byProduct = [...products.values()].sort(
@@ -91,6 +133,36 @@ export function summarize(rows: CleanRow[], productNames: Record<string, string>
     statuses: [...statuses.values()].sort((a, b) => b.lines - a.lines),
     linesInRange: rows.length,
   };
+}
+
+export interface DayPoint {
+  day: string;
+  byChannel: Record<Channel, number>;
+  total: number;
+}
+
+/** Every calendar day from first to last (inclusive), as "YYYY-MM-DD". */
+export function daysBetween(first: string, last: string): string[] {
+  const [y, m, d] = first.split('-').map(Number);
+  const days: string[] = [];
+  for (let i = 0; ; i++) {
+    const day = new Date(Date.UTC(y, m - 1, d + i)).toISOString().slice(0, 10);
+    if (day > last) return days;
+    days.push(day);
+  }
+}
+
+/** Net revenue per day and channel. Days without sales are included with zero. */
+export function dailyRevenue(rows: CleanRow[], first: string, last: string): DayPoint[] {
+  const points = daysBetween(first, last).map((day) => ({ day, byChannel: emptyByChannel(), total: 0 }));
+  const index = new Map(points.map((p, i) => [p.day, i]));
+  for (const r of rows) {
+    const i = index.get(r.day);
+    if (r.status !== 'counted' || i === undefined) continue;
+    points[i].byChannel[r.channel] += r.totalPrice;
+    points[i].total += r.totalPrice;
+  }
+  return points;
 }
 
 function sum(values: number[]): number {
