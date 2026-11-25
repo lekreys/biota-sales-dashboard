@@ -97,3 +97,9 @@ SETELAH ITU BUATIN YANG PROMPT LOG  SAMA SIAPIN AKU MAU SIAPIN BUAT DI VERCEL DE
 ```text
 DAN PASTIKAN UNTUK SEMUA PERSYARATAN DI @"Home_Test/AI-Native Software Engineer — Tes Take-Home.pdf"  UDH LENGKAP SEMUA DAN BAGUS KERJAKAN SEMUA YANGDETAIL
 ```
+
+## 16. Prompt · 25 Nov 2026 15:57 WIB
+
+```text
+untuk yang csv aku aja nanti upload manual gitu terus jalanin yang log prompt
+```
