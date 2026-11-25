@@ -1,153 +1,124 @@
 # Log Prompt — Claude Code
 
-Dokumen ini memuat seluruh prompt yang saya berikan kepada Claude Code selama mengerjakan tes take-home,
-secara berurutan dari awal sampai akhir. Termasuk di dalamnya prompt susulan yang saya kirim ketika Claude
-sedang bekerja, serta jawaban saya atas pertanyaan pilihan ganda dari Claude.
+- Tool: Claude Code (ekstensi VS Code)
+- Model: Claude Opus 5.5 (`claude-opus-5-5`)
 
-Teks prompt diekspor otomatis dari file sesi Claude Code dan **tidak diubah sama sekali**, sesuai instruksi
-brief. Pengelompokan per tahap ditambahkan hanya untuk memudahkan membaca.
-Percakapan lengkap beserta balasan Claude tersedia di
-[`claude-code-conversation.md`](claude-code-conversation.md).
+## 1. Prompt
 
-| | |
+```text
+Tolong pelajari isi folder @Home_Test/, termasuk arahan tes dan data yang ada di dalamnya. Saya ingin menyelesaikan tes take-home ini sesuai dengan arahan dan data tersebut.
+
+Sebelum mulai mengerjakan, saya minta kamu menyusun prompt eksekusi terlebih dahulu, supaya nantinya Claude Code dapat mengerjakan tes ini dengan hasil yang baik.
+
+Untuk menyusun prompt tersebut, mari kita brainstorming terlebih dahulu. Ajukan pertanyaan yang detail kepada saya mengenai hal-hal yang perlu diputuskan sebelum pengerjaan dimulai.
+```
+
+## 2. Jawaban atas pertanyaan Claude (pilihan ganda)
+
+| Pertanyaan | Jawaban |
 |---|---|
-| Tool | Claude Code (ekstensi VS Code) |
-| Model AI | Claude Opus 5.5 (`claude-opus-5-5`) |
-| Sesi | 1 sesi, 25 Nov 2026, 11:56–16:05 WIB |
-| Jumlah prompt | 19 |
+| Data yang tersedia adalah `biota_orders_oct2026.xlsx` yang format tanggal dan harganya sudah berubah, padahal aplikasi harus mem-parse CSV asli. Apakah file .csv aslinya tersedia? | Ada CSV asli |
+| Stack apa yang akan dipakai? (Penting untuk sesi live 60 menit, karena kode harus dijelaskan dan bug diperbaiki secara langsung.) | Vite + React + TypeScript |
+| Status "Dikomplain - Retur" (2 baris Tokopedia, Rp437.000) ambigu karena retur belum final. Bagaimana perlakuannya? | Tidak dihitung |
+| Gaya prompt untuk Claude Code? (Penilai membaca log prompt untuk melihat cara mengarahkan dan mengecek AI.) | Bertahap dengan checkpoint |
 
-## Ringkasan per tahap
+## 3. Jawaban atas pertanyaan Claude (pilihan ganda)
 
-| Tahap | Prompt |
+| Pertanyaan | Jawaban |
 |---|---|
-| Perencanaan dan keputusan tentang data | 1–5 |
-| Pembuatan aplikasi dan deploy pertama | 6 |
-| Interaksi, tampilan, dan verifikasi angka | 7–10 |
-| Penyederhanaan, README, dan kerapian kode | 11–13 |
-| Persiapan pengiriman: log prompt, deploy, dan kelengkapan syarat | 14–19 |
+| Brief melarang menyebarkan brief dan datanya, padahal repo GitHub wajib dikirim. Bagaimana menangani file CSV di repo? | Repo publik dengan CSV (diubah di entri 16–17) |
+| Bahasa untuk UI dashboard dan README? (README harus bisa dipahami orang non-teknis.) | Bahasa Indonesia |
+| Fitur tambahan di luar 6 syarat wajib (brief menekankan "sesederhana mungkin") | Panel rekonsiliasi, upload banyak CSV, bar chart sederhana, unduh data bersih, dan "Other" (diklarifikasi di entri 4) |
+| Seberapa ketat testing untuk logika data? | Unit test + golden test |
 
-## Daftar prompt
+## 4. Jawaban atas pertanyaan Claude (pilihan ganda)
 
-### Perencanaan dan keputusan tentang data
+| Pertanyaan | Jawaban |
+|---|---|
+| Opsi "Other" dicentang tanpa isi. Fitur tambahan apa yang dimaksud? | Tidak ada, salah klik |
+| Satu SKU punya nama listing berbeda di tiap marketplace (mis. BIO-CAM-BF). Nama apa yang ditampilkan di tabel produk? | Nama listing terpendek |
+| Akun dan tool untuk deploy sudah siap? | GitHub + Vercel (dashboard) |
 
-#### 1. Prompt · 25 Nov 2026 11:56 WIB
+## 5. Prompt (dikirim saat Claude sedang bekerja)
 
 ```text
-kamu lihat di @Home_Test/  . aku mau buat home test ini dari arahan dan data yang ada, tapi kasih aku prompt dlu buat nanti claude code wxwcutenya bagus . tanya aku yang detail aja brandstorm dlu
+Setelah prompt selesai disusun, langsung kerjakan secara detail sampai selesai. Tidak perlu mengajukan pertanyaan lagi.
 ```
 
-#### 2. Jawaban atas pertanyaan pilihan ganda dari Claude · 25 Nov 2026 12:01 WIB
+## 6. Prompt
 
 ```text
-Your questions have been answered: "Data yang kamu punya adalah biota_orders_oct2026.xlsx (sheet-nya bernama .csv, jadi ini CSV yang sudah dibuka di Sheets/Excel). Format tanggal/harga aslinya sudah berubah, padahal app harus parse CSV asli. Kamu punya file .csv aslinya?"="Ada CSV asli", "Stack apa yang mau dipakai? Penting juga untuk sesi live 60 menit, karena kamu harus menjelaskan kode dan memperbaiki bug secara langsung, jadi pilih yang paling kamu kuasai."="Vite+React+TS (Rekomendasi)", "Status 'Dikomplain - Retur' (2 baris Tokopedia, Rp437.000) ambigu: pembeli komplain dan retur sedang berjalan, belum final. Mau diperlakukan bagaimana?"="Tidak dihitung (Rekomendasi)", "Gaya prompt untuk Claude Code? Penilai membaca log prompt untuk melihat cara kamu mengarahkan dan mengecek AI."="Bertahap + checkpoint (Rek.)". You can now continue with these answers in mind.
+Silakan langsung mulai mengerjakan.
 ```
 
-#### 3. Jawaban atas pertanyaan pilihan ganda dari Claude · 25 Nov 2026 12:02 WIB
+## 7. Prompt
 
 ```text
-The user answered: "Brief melarang menyebarkan brief dan datanya, padahal repo GitHub wajib dikirim. Bagaimana menangani file CSV di repo?"="Public dengan CSV", "Bahasa untuk UI dashboard dan README? (README harus bisa dipahami orang non-teknis.)"="Indonesia (Rek.)", "Fitur tambahan di luar 6 syarat wajib (brief menekankan 'sesederhana mungkin'). Pilih yang mau dimasukkan:"="Panel rekonsiliasi (Rek.), Upload banyak CSV, Bar chart sederhana, Other, Unduh data bersih", "Seberapa ketat testing untuk logika data?"="Unit + golden test (Rek.)". Read the answers carefully — they may request clarification, changes, or that you not proceed — and follow what they actually say.
+Tolong buat tampilan dashboard lebih menarik dan interaktif.
 ```
 
-#### 4. Jawaban atas pertanyaan pilihan ganda dari Claude · 25 Nov 2026 12:03 WIB
+## 8. Prompt
 
 ```text
-Your questions have been answered: "Di pertanyaan scope tadi kamu mencentang 'Other' tapi tidak ada isinya. Fitur tambahan apa yang kamu maksud? (Pilih 'Other' lagi kalau mau mengetik sendiri.)"="Tidak ada, salah klik", "Satu SKU punya nama listing berbeda di tiap marketplace (mis. BIO-CAM-BF = 'BIOTA Smart Camera Battery Fixed - CCTV Wifi Tanpa Kabel' / 'Kamera CCTV Battery Fixed BIOTA'). Nama apa yang ditampilkan di tabel produk?"="Nama listing terpendek", "Akun dan tool untuk deploy sudah siap? Ini menentukan langkah deploy di prompt."="GitHub + Vercel (dashboard)". You can now continue with these answers in mind.
+Jika memungkinkan, gunakan navigasi berbasis tab dan elemen interaktif agar tampilannya mengesankan saat dipresentasikan di interview, tetapi tetap rapi dan sederhana.
 ```
 
-#### 5. Prompt susulan (dikirim saat Claude sedang bekerja) · 25 Nov 2026 12:02 WIB
+## 9. Prompt (dikirim saat Claude sedang bekerja)
 
 ```text
-setelah prompt jadi langsung kerjakan aja ya yang detail ga ush tanya tanya lagi kerjakan sampe selesai
+Untuk chart, gunakan palet warna yang tidak terlihat generik seperti buatan AI. Selain itu, kurangi kebutuhan scroll panjang ke bawah.
 ```
 
-### Pembuatan aplikasi dan deploy pertama
-
-#### 6. Prompt · 25 Nov 2026 13:47 WIB
+## 10. Prompt (dikirim saat Claude sedang bekerja)
 
 ```text
-langsung kerjakna aja ua
+Pastikan semua perhitungan dan formula sudah benar. Jika memungkinkan, buat chart yang lebih menarik.
 ```
 
-### Interaksi, tampilan, dan verifikasi angka
-
-#### 7. Prompt · 25 Nov 2026 13:55 WIB
+## 11. Prompt
 
 ```text
-buat yang keren interaktif dong
+Bagian "Kualitas Data" dan "Data Bersih" masih membingungkan, dan tampilannya terlalu ramai. Tolong sederhanakan dan hapus elemen yang tidak perlu.
 ```
 
-#### 8. Prompt · 25 Nov 2026 14:09 WIB
+## 12. Prompt
 
 ```text
-kalo bisa ada tabnya gitu atau buat interaktif dan keren gitu biar wow gitu pas interview rapih simple
+Tulis README sesederhana mungkin agar mudah dipahami oleh pembaca non-teknis.
 ```
 
-#### 9. Prompt susulan (dikirim saat Claude sedang bekerja) · 25 Nov 2026 14:17 WIB
+## 13. Prompt
 
 ```text
-untuk chart terus warna jangan seperti ai dong dan aku agak ga suka kalo scroll ke bawah terus
+Rapikan kode sesuai prinsip clean code dan hapus semua komentar.
 ```
 
-#### 10. Prompt susulan (dikirim saat Claude sedang bekerja) · 25 Nov 2026 14:27 WIB
+## 14. Prompt (dikirim saat Claude sedang bekerja)
 
 ```text
-dan pastikan yansemua perhiutngan formula bener , kalo bisa chartnya yang keren dan menarik ya
+Setelah itu, susun log prompt dan siapkan proyek untuk deploy ke Vercel.
 ```
 
-### Penyederhanaan, README, dan kerapian kode
-
-#### 11. Prompt · 25 Nov 2026 14:37 WIB
+## 15. Prompt (dikirim saat Claude sedang bekerja)
 
 ```text
-untuk kualitas data dandata bersih itu biingung aku , TRERUS RAME BGT KALO BISA SIMPLE SIMPLE AJA ILANGIN YANG GA PERLU
+Pastikan semua persyaratan dalam @"Home_Test/AI-Native Software Engineer — Tes Take-Home.pdf" sudah terpenuhi secara lengkap dan berkualitas. Kerjakan semuanya secara detail.
 ```
 
-#### 12. Prompt · 25 Nov 2026 15:01 WIB
+## 16. Prompt
 
 ```text
-REDME NYA BUAT SIMPLE BENER EBENR ORANG NON TEKNIK PAHAM
+File CSV akan saya unggah secara manual nanti, jadi tidak perlu disertakan di repo. Lanjutkan penyusunan log prompt.
 ```
 
-#### 13. Prompt · 25 Nov 2026 15:03 WIB
+## 17. Prompt
 
 ```text
-LALU TOLONG BUAT KODENYA RAPI YAH CLEAN CODE , UNTUK KOMEN KOMEN APUS SEMUA
+Jadi, setelah aplikasi di-deploy, saya akan mengunggah CSV langsung melalui aplikasi. Data tidak perlu disimpan di repo.
 ```
 
-### Persiapan pengiriman: log prompt, deploy, dan kelengkapan syarat
-
-#### 14. Prompt susulan (dikirim saat Claude sedang bekerja) · 25 Nov 2026 15:13 WIB
+## 18. Prompt (dikirim saat Claude sedang bekerja)
 
 ```text
-SETELAH ITU BUATIN YANG PROMPT LOG  SAMA SIAPIN AKU MAU SIAPIN BUAT DI VERCEL DEPLOYNYA
-```
-
-#### 15. Prompt susulan (dikirim saat Claude sedang bekerja) · 25 Nov 2026 15:14 WIB
-
-```text
-DAN PASTIKAN UNTUK SEMUA PERSYARATAN DI @"Home_Test/AI-Native Software Engineer — Tes Take-Home.pdf"  UDH LENGKAP SEMUA DAN BAGUS KERJAKAN SEMUA YANGDETAIL
-```
-
-#### 16. Prompt · 25 Nov 2026 15:57 WIB
-
-```text
-untuk yang csv aku aja nanti upload manual gitu terus jalanin yang log prompt
-```
-
-#### 17. Prompt · 25 Nov 2026 15:59 WIB
-
-```text
-jadi nanti pas appnya jalan udh di deploya aku upload aja csvnya ga ush taro datanya di repo
-```
-
-#### 18. Prompt susulan (dikirim saat Claude sedang bekerja) · 25 Nov 2026 16:02 WIB
-
-```text
-lengkapin prompt lognya
-```
-
-#### 19. Prompt susulan (dikirim saat Claude sedang bekerja) · 25 Nov 2026 16:04 WIB
-
-```text
-nah tolong promptnya buat lebih profesional dong
+Tolong lengkapi log prompt.
 ```
