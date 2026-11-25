@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFilters, dailyRevenue, daysBetween, filterByDate, movingAverage, NO_FILTERS, summarize } from './metrics';
+import { applyFilters, dailyRevenue, daysBetween, isValidRange, movingAverage, NO_FILTERS, summarize } from './metrics';
 import type { CleanRow } from './types';
 
 function line(overrides: Partial<CleanRow> = {}): CleanRow {
@@ -21,20 +21,46 @@ function line(overrides: Partial<CleanRow> = {}): CleanRow {
   };
 }
 
-describe('filterByDate', () => {
-  const rows = [
+describe('applyFilters', () => {
+  const byDay = [
     line({ day: '2026-10-01', time: null }),
     line({ day: '2026-10-15', time: '22:36' }),
     line({ day: '2026-10-16', time: '00:00' }),
   ];
 
-  it('includes both ends of the range, including late on the last day', () => {
-    expect(filterByDate(rows, '2026-10-01', '2026-10-15').map((r) => r.day)).toEqual(['2026-10-01', '2026-10-15']);
+  it('includes both ends of the date range, including late on the last day', () => {
+    const rows = applyFilters(byDay, { ...NO_FILTERS, from: '2026-10-01', to: '2026-10-15' });
+    expect(rows.map((r) => r.day)).toEqual(['2026-10-01', '2026-10-15']);
   });
 
-  it('treats an empty bound as no limit', () => {
-    expect(filterByDate(rows, '', '')).toHaveLength(3);
-    expect(filterByDate(rows, '2026-10-16', '')).toHaveLength(1);
+  it('treats an empty date bound as no limit', () => {
+    expect(applyFilters(byDay, NO_FILTERS)).toHaveLength(3);
+    expect(applyFilters(byDay, { ...NO_FILTERS, from: '2026-10-16' })).toHaveLength(1);
+  });
+
+  const mixed = [
+    line({ day: '2026-10-01', channel: 'Shopee', sku: 'A' }),
+    line({ day: '2026-10-10', channel: 'Tokopedia', sku: 'B' }),
+    line({ day: '2026-10-20', channel: 'TikTok Shop', sku: '', productName: 'Tanpa SKU' }),
+  ];
+
+  it('combines date, channel and product filters', () => {
+    expect(applyFilters(mixed, { ...NO_FILTERS, from: '2026-10-05' })).toHaveLength(2);
+    expect(applyFilters(mixed, { ...NO_FILTERS, channels: ['Shopee', 'Tokopedia'] })).toHaveLength(2);
+    expect(applyFilters(mixed, { ...NO_FILTERS, product: 'B' }).map((r) => r.sku)).toEqual(['B']);
+    expect(applyFilters(mixed, { ...NO_FILTERS, product: 'TANPA SKU: Tanpa SKU' })).toHaveLength(1);
+    expect(applyFilters(mixed, { ...NO_FILTERS, from: '2026-10-05', channels: ['Shopee'] })).toHaveLength(0);
+  });
+
+  it('can ignore one filter so a panel keeps its context', () => {
+    const filters = { ...NO_FILTERS, from: '2026-10-05', channels: ['Shopee' as const] };
+    expect(applyFilters(mixed, filters, { channel: true })).toHaveLength(2);
+    expect(applyFilters(mixed, filters, { date: true })).toHaveLength(1);
+  });
+
+  it('knows when a date range is invalid', () => {
+    expect(isValidRange({ ...NO_FILTERS, from: '2026-10-20', to: '2026-10-10' })).toBe(false);
+    expect(isValidRange({ ...NO_FILTERS, from: '2026-10-10', to: '2026-10-10' })).toBe(true);
   });
 });
 
@@ -52,6 +78,7 @@ describe('summarize', () => {
     expect(summary.netRevenue).toBe(350);
     expect(summary.units).toBe(4);
     expect(summary.orders).toBe(2);
+    expect(summary.excludedLines).toBe(2);
   });
 
   it('splits net revenue per channel and always lists all three channels', () => {
@@ -69,41 +96,18 @@ describe('summarize', () => {
     ]);
   });
 
-  it('reports what was excluded and why', () => {
-    expect(summary.excluded.cancelled).toEqual({ lines: 1, value: 999 });
-    expect(summary.excluded.returned).toEqual({ lines: 1, value: 777 });
-    expect(summary.excluded.unknown).toEqual({ lines: 0, value: 0 });
-  });
-
   it('splits each product by channel, adding up to its net revenue', () => {
-    const a = summary.byProduct.find((p) => p.sku === 'A')!;
-    expect(a.byChannel).toEqual({ Shopee: 200, 'TikTok Shop': 0, Tokopedia: 100 });
-  });
-});
-
-describe('applyFilters', () => {
-  const rows = [
-    line({ day: '2026-10-01', channel: 'Shopee', sku: 'A' }),
-    line({ day: '2026-10-10', channel: 'Tokopedia', sku: 'B' }),
-    line({ day: '2026-10-20', channel: 'TikTok Shop', sku: '', productName: 'Tanpa SKU' }),
-  ];
-
-  it('keeps everything with no filters', () => {
-    expect(applyFilters(rows, NO_FILTERS)).toHaveLength(3);
+    const productA = summary.byProduct.find((p) => p.sku === 'A')!;
+    expect(productA.byChannel).toEqual({ Shopee: 200, 'TikTok Shop': 0, Tokopedia: 100 });
   });
 
-  it('combines date, channel and product filters', () => {
-    expect(applyFilters(rows, { ...NO_FILTERS, from: '2026-10-05' })).toHaveLength(2);
-    expect(applyFilters(rows, { ...NO_FILTERS, channels: ['Shopee', 'Tokopedia'] })).toHaveLength(2);
-    expect(applyFilters(rows, { ...NO_FILTERS, product: 'B' }).map((r) => r.sku)).toEqual(['B']);
-    expect(applyFilters(rows, { ...NO_FILTERS, product: 'TANPA SKU: Tanpa SKU' })).toHaveLength(1);
-    expect(applyFilters(rows, { ...NO_FILTERS, from: '2026-10-05', channels: ['Shopee'] })).toHaveLength(0);
-  });
-
-  it('can ignore one filter so a panel keeps its context', () => {
-    const f = { ...NO_FILTERS, from: '2026-10-05', channels: ['Shopee' as const] };
-    expect(applyFilters(rows, f, { channel: true })).toHaveLength(2);
-    expect(applyFilters(rows, f, { date: true })).toHaveLength(1);
+  it('lists every raw status with its treatment', () => {
+    expect(summary.statuses.map((s) => [s.statusRaw, s.category, s.lines])).toEqual([
+      ['Selesai', 'counted', 2],
+      ['Sedang Dikirim', 'counted', 1],
+      ['Batal', 'cancelled', 1],
+      ['Refunded', 'returned', 1],
+    ]);
   });
 });
 
@@ -114,7 +118,7 @@ describe('dailyRevenue', () => {
       line({ day: '2026-10-01', channel: 'Tokopedia', totalPrice: 50 }),
       line({ day: '2026-10-03', channel: 'Shopee', totalPrice: 70 }),
       line({ day: '2026-10-03', totalPrice: 999, status: 'cancelled' }),
-      line({ day: '2026-11-01', totalPrice: 5 }), // outside the range
+      line({ day: '2026-11-01', totalPrice: 5 }),
     ];
     const days = dailyRevenue(rows, '2026-10-01', '2026-10-03');
     expect(days.map((d) => [d.day, d.total])).toEqual([

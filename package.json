@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "verify": "python3 scripts/verify_numbers.py data/biota_orders_oct2026.csv"
+    "verify": "python3 scripts/verify_numbers.py data/biota_orders_oct2026.csv",
+    "format": "prettier --write .",
+    "lint": "prettier --check . && tsc --noEmit"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
@@ -22,6 +24,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "prettier": "^3.3.3",
     "typescript": "~5.6.3",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"

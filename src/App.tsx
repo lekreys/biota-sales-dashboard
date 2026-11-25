@@ -1,42 +1,35 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
-import { ChannelCards } from './components/ChannelCards';
+import { ChannelPanel } from './components/ChannelPanel';
 import { DataTab } from './components/DataTab';
+import { EmptyState, FileActions } from './components/FileUpload';
 import { FilterBar } from './components/FilterBar';
 import { CloseIcon, LogoMark, MoonIcon, SunIcon } from './components/Icons';
-import { KpiRow } from './components/KpiRow';
+import { KpiStrip } from './components/KpiStrip';
 import { ProductTable } from './components/ProductTable';
 import { Tabs } from './components/Tabs';
 import { TopProducts } from './components/TopProducts';
 import { TrendChart } from './components/TrendChart';
-import { EmptyState, FileActions } from './components/UploadArea';
+import { useHashTab } from './hooks/useHashTab';
+import { useTheme } from './hooks/useTheme';
 import { cleanRows } from './lib/clean';
-import { readCsv, toCsv } from './lib/csv';
+import { downloadCsv, readFiles, toCsv } from './lib/csv';
+import type { NamedFile } from './lib/csv';
 import { formatDay } from './lib/format';
-import { applyFilters, dailyRevenue, NO_FILTERS, summarize } from './lib/metrics';
+import { buildDashboard, isValidRange, NO_FILTERS } from './lib/metrics';
 import type { Filters } from './lib/metrics';
 import { CHANNELS } from './lib/types';
 import type { Channel, SourceFile } from './lib/types';
 
-type Theme = 'light' | 'dark' | null; // null = follow the operating system
+const TABS = [
+  { id: 'ringkasan', label: 'Ringkasan' },
+  { id: 'produk', label: 'Produk' },
+  { id: 'data', label: 'Data' },
+] as const;
 
-const TAB_IDS = ['ringkasan', 'produk', 'data'] as const;
-type TabId = (typeof TAB_IDS)[number];
+type TabId = (typeof TABS)[number]['id'];
 
-function storedTheme(): Theme {
-  try {
-    const t = localStorage.getItem('theme');
-    return t === 'light' || t === 'dark' ? t : null;
-  } catch {
-    return null;
-  }
-}
-
-/** The open tab lives in the URL (#produk), so a refresh or a shared link opens the same tab. */
-function tabFromHash(): TabId {
-  const id = window.location.hash.slice(1);
-  return (TAB_IDS as readonly string[]).includes(id) ? (id as TabId) : 'ringkasan';
-}
+const SAMPLE_FILE = 'biota_orders_oct2026.csv';
 
 const hasFiles = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
 
@@ -44,76 +37,27 @@ export default function App() {
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-  const [theme, setTheme] = useState<Theme>(storedTheme);
-  const [tab, setTab] = useState<TabId>(tabFromHash);
   const [dragging, setDragging] = useState(false);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme) root.dataset.theme = theme;
-    else delete root.dataset.theme;
-    try {
-      if (theme) localStorage.setItem('theme', theme);
-      else localStorage.removeItem('theme');
-    } catch {
-      // storage unavailable (private mode): the toggle still works for this visit
-    }
-  }, [theme]);
-  const isDark = theme === 'dark' || (theme === null && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
-
-  useEffect(() => {
-    if (files.length) history.replaceState(null, '', `#${tab}`);
-  }, [tab, files.length]);
+  const [tab, setTab] = useHashTab<TabId>(
+    TABS.map((t) => t.id),
+    'ringkasan',
+    files.length > 0,
+  );
+  const { isDark, toggleTheme } = useTheme();
 
   const cleaned = useMemo(() => (files.length ? cleanRows(files) : null), [files]);
-  const bounds = useMemo(() => {
-    if (!cleaned || cleaned.rows.length === 0) return null;
-    const days = cleaned.rows.map((r) => r.day).sort();
-    return { min: days[0], max: days[days.length - 1] };
-  }, [cleaned]);
-  const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
+  const dashboard = useMemo(() => (cleaned ? buildDashboard(cleaned, filters) : null), [cleaned, filters]);
 
-  // Every panel uses the same filters. Some ignore one filter so they keep their context (see applyFilters).
-  const view = useMemo(() => {
-    if (!cleaned || !bounds) return null;
-    const rows = invalidRange ? [] : cleaned.rows;
-    const names = cleaned.productNames;
-    const filtered = applyFilters(rows, filters);
-    const withAllChannels = applyFilters(rows, filters, { channel: true });
-    return {
-      rows: filtered,
-      summary: summarize(filtered, names),
-      file: summarize(cleaned.rows, names),
-      channels: summarize(withAllChannels, names).byChannel,
-      channelDaily: dailyRevenue(withAllChannels, filters.from || bounds.min, filters.to || bounds.max),
-      products: summarize(applyFilters(rows, filters, { product: true }), names).byProduct,
-      daily: dailyRevenue(applyFilters(cleaned.rows, filters, { date: true }), bounds.min, bounds.max),
-    };
-  }, [cleaned, bounds, filters, invalidRange]);
-
-  async function addFiles(list: { name: string; text: () => Promise<string> }[]) {
-    const added: SourceFile[] = [];
-    const problems: string[] = [];
-    for (const file of list) {
-      if (!file.name.toLowerCase().endsWith('.csv')) {
-        problems.push(`${file.name}: bukan file CSV. Simpan/ekspor sebagai .csv terlebih dahulu.`);
-        continue;
-      }
-      const result = readCsv(await file.text());
-      if (!result.ok) problems.push(`${file.name}: ${result.error}`);
-      else if (result.rows.length === 0) problems.push(`${file.name}: file tidak berisi data.`);
-      else added.push({ name: file.name, rows: result.rows });
-    }
+  async function addFiles(list: NamedFile[]) {
+    const { files: added, problems } = await readFiles(list);
     setErrors(problems);
-    if (added.length) {
-      // A file with the same name replaces the earlier upload.
-      setFiles((current) => [...current.filter((f) => !added.some((a) => a.name === f.name)), ...added]);
-    }
+    if (added.length === 0) return;
+    setFiles((current) => [...current.filter((file) => !added.some((a) => a.name === file.name)), ...added]);
   }
 
   async function loadSample() {
     const { default: text } = await import('../data/biota_orders_oct2026.csv?raw');
-    await addFiles([{ name: 'biota_orders_oct2026.csv', text: async () => text }]);
+    await addFiles([{ name: SAMPLE_FILE, text: async () => text }]);
   }
 
   function reset() {
@@ -124,30 +68,21 @@ export default function App() {
     history.replaceState(null, '', window.location.pathname);
   }
 
-  const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
-  const soloChannel = (c: Channel) =>
-    setFilters((f) => ({ ...f, channels: f.channels.length === 1 && f.channels[0] === c ? [...CHANNELS] : [c] }));
-  const toggleProduct = (key: string) => setFilters((f) => ({ ...f, product: f.product === key ? null : key }));
+  const updateFilters = (patch: Partial<Filters>) => setFilters((current) => ({ ...current, ...patch }));
 
-  const productName = filters.product && cleaned ? (cleaned.productNames[filters.product] ?? filters.product) : null;
-  const periodLabel = bounds ? `${formatDay(filters.from || bounds.min)} – ${formatDay(filters.to || bounds.max)}` : '';
-  const scopeLabel = [
-    filters.channels.length < CHANNELS.length ? filters.channels.join(' + ') : '',
-    productName ?? '',
-  ]
+  const soloChannel = (channel: Channel) =>
+    setFilters((current) => ({
+      ...current,
+      channels: current.channels.length === 1 && current.channels[0] === channel ? [...CHANNELS] : [channel],
+    }));
+
+  const toggleProduct = (key: string) =>
+    setFilters((current) => ({ ...current, product: current.product === key ? null : key }));
+
+  const productName = filters.product ? (cleaned?.productNames[filters.product] ?? filters.product) : null;
+  const scopeLabel = [filters.channels.length < CHANNELS.length ? filters.channels.join(' + ') : '', productName ?? '']
     .filter(Boolean)
     .join(' · ');
-
-  function download() {
-    if (!cleaned) return;
-    const blob = new Blob([toCsv(cleaned.rows)], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `data_bersih_${bounds?.min}_sd_${bounds?.max}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <div
@@ -173,28 +108,19 @@ export default function App() {
           <div>
             <p className="brand-name">Dashboard Penjualan</p>
             <p className="brand-sub">
-              BIOTA Smart Home{bounds && ` · ${formatDay(bounds.min)} – ${formatDay(bounds.max)}`}
+              BIOTA Smart Home
+              {dashboard && ` · ${formatDay(dashboard.first)} – ${formatDay(dashboard.last)}`}
             </p>
           </div>
         </div>
 
-        {view && (
-          <Tabs
-            active={tab}
-            onChange={setTab}
-            tabs={[
-              { id: 'ringkasan', label: 'Ringkasan' },
-              { id: 'produk', label: 'Produk' },
-              { id: 'data', label: 'Data' },
-            ]}
-          />
-        )}
+        {dashboard && <Tabs tabs={[...TABS]} active={tab} onChange={setTab} />}
 
         <div className="topbar-actions">
           {files.length > 0 && <FileActions files={files} onFiles={addFiles} onReset={reset} />}
           <button
             className="icon-button"
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            onClick={toggleTheme}
             aria-label={isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
             title={isDark ? 'Mode terang' : 'Mode gelap'}
           >
@@ -203,36 +129,46 @@ export default function App() {
         </div>
       </header>
 
-      {view && bounds && tab !== 'data' && (
+      {dashboard && tab !== 'data' && (
         <FilterBar
           filters={filters}
-          min={bounds.min}
-          max={bounds.max}
-          invalid={invalidRange}
+          min={dashboard.first}
+          max={dashboard.last}
+          invalid={!isValidRange(filters)}
           productName={productName}
-          onChange={update}
+          onChange={updateFilters}
           onReset={() => setFilters(NO_FILTERS)}
         />
       )}
 
       <main className="main">
-        {!view || !cleaned ? (
+        {!dashboard || !cleaned ? (
           <EmptyState onFiles={addFiles} onSample={loadSample} />
         ) : (
-          <div className={`panel panel-${tab}`} role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} key={tab}>
+          <div
+            className={`panel panel-${tab}`}
+            role="tabpanel"
+            id={`panel-${tab}`}
+            aria-labelledby={`tab-${tab}`}
+            key={tab}
+          >
             {tab === 'ringkasan' && (
               <>
-                <KpiRow summary={view.summary} periodLabel={periodLabel} scopeLabel={scopeLabel} />
+                <KpiStrip
+                  summary={dashboard.summary}
+                  periodLabel={`${formatDay(filters.from || dashboard.first)} – ${formatDay(filters.to || dashboard.last)}`}
+                  scopeLabel={scopeLabel}
+                />
                 <TrendChart
-                  points={view.daily}
+                  points={dashboard.daily}
                   from={filters.from}
                   to={filters.to}
                   channels={filters.channels}
-                  onSelect={(from, to) => update({ from, to })}
+                  onSelect={(from, to) => updateFilters({ from, to })}
                 />
-                <ChannelCards
-                  channels={view.channels}
-                  daily={view.channelDaily}
+                <ChannelPanel
+                  channels={dashboard.channels}
+                  daily={dashboard.channelDaily}
                   selected={filters.channels}
                   onSolo={soloChannel}
                 />
@@ -242,16 +178,24 @@ export default function App() {
             {tab === 'produk' && (
               <>
                 <TopProducts
-                  products={view.products}
+                  products={dashboard.products}
                   channels={filters.channels}
                   selected={filters.product}
                   onSelect={toggleProduct}
                 />
-                <ProductTable products={view.products} selected={filters.product} onSelect={toggleProduct} />
+                <ProductTable products={dashboard.products} selected={filters.product} onSelect={toggleProduct} />
               </>
             )}
 
-            {tab === 'data' && <DataTab cleaned={cleaned} file={view.file} onDownload={download} />}
+            {tab === 'data' && (
+              <DataTab
+                cleaned={cleaned}
+                file={dashboard.file}
+                onDownload={() =>
+                  downloadCsv(`data_bersih_${dashboard.first}_sd_${dashboard.last}.csv`, toCsv(cleaned.rows))
+                }
+              />
+            )}
           </div>
         )}
       </main>
@@ -259,8 +203,8 @@ export default function App() {
       {errors.length > 0 && (
         <div className="toast" role="alert">
           <ul>
-            {errors.map((e) => (
-              <li key={e}>{e}</li>
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
             ))}
           </ul>
           <button className="icon-button" aria-label="Tutup pesan" onClick={() => setErrors([])}>

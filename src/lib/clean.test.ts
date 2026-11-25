@@ -37,9 +37,13 @@ describe('cleanRows', () => {
   });
 
   it('keeps two different products in the same order', () => {
-    const result = cleanRows([
-      { name: 'a.csv', rows: [row(), row({ sku: 'BIO-SD-S64', product_name: 'MicroSD 64GB', unit_price: '119000', total_price: '119000' })] },
-    ]);
+    const otherProduct = row({
+      sku: 'BIO-SD-S64',
+      product_name: 'MicroSD 64GB',
+      unit_price: '119000',
+      total_price: '119000',
+    });
+    const result = cleanRows([{ name: 'a.csv', rows: [row(), otherProduct] }]);
     expect(result.rows).toHaveLength(2);
     expect(result.duplicatesRemoved).toBe(0);
   });
@@ -70,7 +74,10 @@ describe('cleanRows', () => {
 
   it('rejects unreadable rows with a reason instead of dropping them silently', () => {
     const result = cleanRows([
-      { name: 'a.csv', rows: [row(), row({ order_date: 'kemarin' }), row({ channel: 'Lazada' }), row({ total_price: '' })] },
+      {
+        name: 'a.csv',
+        rows: [row(), row({ order_date: 'kemarin' }), row({ channel: 'Lazada' }), row({ total_price: '' })],
+      },
     ]);
     expect(result.rows).toHaveLength(1);
     expect(result.rejected.map((r) => r.line)).toEqual([3, 4, 5]);
@@ -85,35 +92,29 @@ describe('cleanRows', () => {
   });
 
   it('uses the shortest listing name as the product name', () => {
-    const result = cleanRows([
-      { name: 'a.csv', rows: [row(), row({ order_id: 'TKP1', channel: 'Tokopedia', product_name: 'Kamera BF BIOTA' })] },
-    ]);
+    const tokopedia = row({ order_id: 'TKP1', channel: 'Tokopedia', product_name: 'Kamera BF BIOTA' });
+    const result = cleanRows([{ name: 'a.csv', rows: [row(), tokopedia] }]);
     expect(result.productNames['BIO-CAM-BF']).toBe('Kamera BF BIOTA');
   });
 
-  it('reports the raw formats and channel spellings it found, and the value of removed duplicates', () => {
-    const result = cleanRows([
-      {
-        name: 'a.csv',
-        rows: [
-          row(),
-          row(),
-          row({ order_id: 'TTS1', channel: 'TIKTOK SHOP', order_date: '21/10/2026 08:24:00', unit_price: '1,099,000', total_price: 'IDR 1,099,000' }),
-        ],
-      },
-    ]);
+  it('reports the formats and channel spellings it found, and the value of removed duplicates', () => {
+    const tiktok = row({
+      order_id: 'TTS1',
+      channel: 'TIKTOK SHOP',
+      order_date: '21/10/2026 08:24:00',
+      unit_price: '1,099,000',
+      total_price: 'IDR 1,099,000',
+    });
+    const result = cleanRows([{ name: 'a.csv', rows: [row(), row(), tiktok] }]);
     expect(result.duplicateValue).toBe(1099000);
-    expect(result.formats.map((f) => [f.field, f.format, f.count, f.channels])).toEqual([
-      ['date', 'YYYY-MM-DD HH:mm', 2, ['Shopee']],
-      ['date', 'DD/MM/YYYY HH:mm:ss', 1, ['TikTok Shop']],
-      ['money', 'Rp 1.234.567', 4, ['Shopee']],
-      ['money', '1,234,567', 1, ['TikTok Shop']],
-      ['money', 'IDR 1,234,567', 1, ['TikTok Shop']],
+    expect(result.formats).toEqual([
+      { field: 'date', format: 'YYYY-MM-DD HH:mm', example: '2026-10-01 10:00' },
+      { field: 'money', format: 'Rp 1.234.567', example: 'Rp1.099.000' },
+      { field: 'date', format: 'DD/MM/YYYY HH:mm:ss', example: '21/10/2026 08:24:00' },
+      { field: 'money', format: '1,234,567', example: '1,099,000' },
+      { field: 'money', format: 'IDR 1,234,567', example: 'IDR 1,099,000' },
     ]);
-    expect(result.channelSpellings).toEqual([
-      { raw: 'Shopee', channel: 'Shopee', count: 2 },
-      { raw: 'TIKTOK SHOP', channel: 'TikTok Shop', count: 1 },
-    ]);
+    expect(result.channelSpellings).toEqual(['Shopee', 'TIKTOK SHOP']);
   });
 
   it('counts lines where qty x unit_price does not match total_price', () => {

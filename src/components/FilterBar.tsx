@@ -2,7 +2,7 @@ import { endOfMonth, monthName } from '../lib/format';
 import type { Filters } from '../lib/metrics';
 import { CHANNELS } from '../lib/types';
 import type { Channel } from '../lib/types';
-import { Swatch } from './channelColor';
+import { Swatch } from './ChannelColor';
 import { CloseIcon } from './Icons';
 
 interface Props {
@@ -15,37 +15,45 @@ interface Props {
   onReset: () => void;
 }
 
-export function FilterBar({ filters, min, max, invalid, productName, onChange, onReset }: Props) {
-  const month = min.slice(0, 7); // presets use the first month in the data
-  const presets = [
+function presetsFor(firstDay: string) {
+  const month = firstDay.slice(0, 7);
+  const lastDay = endOfMonth(firstDay);
+  const name = monthName(firstDay);
+  return [
     { label: 'Semua', from: '', to: '' },
-    { label: `1–15 ${monthName(min)}`, from: `${month}-01`, to: `${month}-15` },
-    { label: `16–${endOfMonth(min).slice(8)} ${monthName(min)}`, from: `${month}-16`, to: endOfMonth(min) },
+    { label: `1–15 ${name}`, from: `${month}-01`, to: `${month}-15` },
+    { label: `16–${lastDay.slice(8)} ${name}`, from: `${month}-16`, to: lastDay },
   ];
-  const allChannels = filters.channels.length === CHANNELS.length;
-  const active = Boolean(filters.from || filters.to || !allChannels || filters.product);
+}
 
-  function toggleChannel(c: Channel) {
-    const next = filters.channels.includes(c) ? filters.channels.filter((x) => x !== c) : [...filters.channels, c];
-    // Never end up with no channel at all: deselecting the last one shows everything again.
-    onChange({ channels: next.length ? CHANNELS.filter((x) => next.includes(x)) : [...CHANNELS] });
+export function FilterBar({ filters, min, max, invalid, productName, onChange, onReset }: Props) {
+  const hasFilter = Boolean(filters.from || filters.to || filters.channels.length < CHANNELS.length || filters.product);
+
+  function toggleChannel(channel: Channel) {
+    const next = filters.channels.includes(channel)
+      ? filters.channels.filter((c) => c !== channel)
+      : [...filters.channels, channel];
+    onChange({ channels: next.length ? CHANNELS.filter((c) => next.includes(c)) : [...CHANNELS] });
   }
 
   return (
-    <div className="filter-row" role="group" aria-label="Filter">
+    <div className="filter-bar" role="group" aria-label="Filter">
       <div className="filter-group">
         <span className="filter-label">Periode</span>
         <div className="segmented">
-          {presets.map((p) => (
-            <button
-              key={p.label}
-              className={p.from === filters.from && p.to === filters.to ? 'active' : ''}
-              aria-pressed={p.from === filters.from && p.to === filters.to}
-              onClick={() => onChange({ from: p.from, to: p.to })}
-            >
-              {p.label}
-            </button>
-          ))}
+          {presetsFor(min).map((preset) => {
+            const isActive = preset.from === filters.from && preset.to === filters.to;
+            return (
+              <button
+                key={preset.label}
+                className={isActive ? 'active' : ''}
+                aria-pressed={isActive}
+                onClick={() => onChange({ from: preset.from, to: preset.to })}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
         </div>
         <span className="date-range">
           <input
@@ -70,17 +78,20 @@ export function FilterBar({ filters, min, max, invalid, productName, onChange, o
 
       <div className="filter-group">
         <span className="filter-label">Channel</span>
-        {CHANNELS.map((c) => (
-          <button
-            key={c}
-            className={`chip-toggle${filters.channels.includes(c) ? ' on' : ''}`}
-            aria-pressed={filters.channels.includes(c)}
-            onClick={() => toggleChannel(c)}
-          >
-            <Swatch channel={c} />
-            {c}
-          </button>
-        ))}
+        {CHANNELS.map((channel) => {
+          const isOn = filters.channels.includes(channel);
+          return (
+            <button
+              key={channel}
+              className={`chip-toggle${isOn ? ' on' : ''}`}
+              aria-pressed={isOn}
+              onClick={() => toggleChannel(channel)}
+            >
+              <Swatch channel={channel} />
+              {channel}
+            </button>
+          );
+        })}
       </div>
 
       {filters.product && (
@@ -95,7 +106,7 @@ export function FilterBar({ filters, min, max, invalid, productName, onChange, o
         </div>
       )}
 
-      {active && (
+      {hasFilter && (
         <button className="link reset" onClick={onReset}>
           Reset filter
         </button>

@@ -4,20 +4,50 @@ import { formatNumber, formatRupiah } from '../lib/format';
 import type { ProductSummary } from '../lib/metrics';
 import { CHANNELS } from '../lib/types';
 import type { Channel } from '../lib/types';
-import { CHANNEL_COLOR, Legend } from './channelColor';
+import { CHANNEL_COLOR, Legend } from './ChannelColor';
 
 interface Props {
-  products: ProductSummary[]; // already ranked; computed without the product filter
+  products: ProductSummary[];
   channels: Channel[];
   selected: string | null;
   onSelect: (key: string) => void;
 }
 
+function ProductTooltip({
+  product,
+  channels,
+  above,
+}: {
+  product: ProductSummary;
+  channels: Channel[];
+  above: boolean;
+}) {
+  return (
+    <span className={`tooltip rank-tooltip${above ? ' up' : ''}`} role="tooltip">
+      <span className="tooltip-title">
+        {product.name} · {product.sku || 'SKU tidak diketahui'}
+      </span>
+      {channels.map((channel) => (
+        <span key={channel} className="tooltip-row">
+          <span className="line-key" style={{ background: CHANNEL_COLOR[channel] }} />
+          <span className="tooltip-value">{formatRupiah(product.byChannel[channel])}</span>
+          <span className="tooltip-label">{channel}</span>
+        </span>
+      ))}
+      <span className="tooltip-row total">
+        <span className="line-key blank" />
+        <span className="tooltip-value">{formatRupiah(product.netRevenue)}</span>
+        <span className="tooltip-label">{formatNumber(product.units)} unit</span>
+      </span>
+    </span>
+  );
+}
+
 export function TopProducts({ products, channels, selected, onSelect }: Props) {
-  const top = products.slice(0, 10);
-  const max = Math.max(1, ...top.map((p) => p.netRevenue));
   const [hover, setHover] = useState<string | null>(null);
-  const shown = CHANNELS.filter((c) => channels.includes(c));
+  const top = products.slice(0, 10);
+  const max = Math.max(1, ...top.map((product) => product.netRevenue));
+  const shown = CHANNELS.filter((channel) => channels.includes(channel));
 
   return (
     <section className="card fill-card">
@@ -33,65 +63,53 @@ export function TopProducts({ products, channels, selected, onSelect }: Props) {
         <p className="secondary">Tidak ada penjualan pada filter ini.</p>
       ) : (
         <div className="scroll-area">
-        <ol className="rank">
-          {top.map((p, i) => {
-            const isSelected = selected === p.key;
-            return (
-              <li key={p.key}>
-                <button
-                  className={`rank-row${isSelected ? ' selected' : ''}${selected && !isSelected ? ' dim' : ''}`}
-                  aria-pressed={isSelected}
-                  onClick={() => onSelect(p.key)}
-                  onPointerEnter={() => setHover(p.key)}
-                  onPointerLeave={() => setHover(null)}
-                  onFocus={() => setHover(p.key)}
-                  onBlur={() => setHover(null)}
-                >
-                  <span className="rank-n">{i + 1}</span>
-                  <span className="rank-main">
-                    <span className="rank-line">
-                      <span className="rank-name" title={p.name}>
-                        {p.name}
-                      </span>
-                      <span className="rank-value">{formatRupiah(p.netRevenue)}</span>
-                    </span>
-                    <span className="rank-bar">
-                      <span className="hbar-track">
-                        <span className="hbar stack" style={{ width: `${(p.netRevenue / max) * 100}%`, '--i': i } as CSSProperties}>
-                          {shown.map((c) =>
-                            p.byChannel[c] > 0 ? (
-                              <span key={c} style={{ flexGrow: p.byChannel[c], background: CHANNEL_COLOR[c] }} />
-                            ) : null,
-                          )}
+          <ol className="rank">
+            {top.map((product, i) => {
+              const isSelected = selected === product.key;
+              return (
+                <li key={product.key}>
+                  <button
+                    className={`rank-row${isSelected ? ' selected' : ''}${selected && !isSelected ? ' dim' : ''}`}
+                    aria-pressed={isSelected}
+                    onClick={() => onSelect(product.key)}
+                    onPointerEnter={() => setHover(product.key)}
+                    onPointerLeave={() => setHover(null)}
+                    onFocus={() => setHover(product.key)}
+                    onBlur={() => setHover(null)}
+                  >
+                    <span className="rank-n">{i + 1}</span>
+                    <span className="rank-main">
+                      <span className="rank-line">
+                        <span className="rank-name" title={product.name}>
+                          {product.name}
                         </span>
+                        <span className="rank-value">{formatRupiah(product.netRevenue)}</span>
                       </span>
-                      <span className="rank-units">{formatNumber(p.units)} unit</span>
-                    </span>
-                  </span>
-                  {hover === p.key && (
-                    <span className={`tooltip rank-tooltip${i >= 5 ? ' up' : ''}`} role="tooltip">
-                      <span className="tooltip-title">
-                        {p.name} · {p.sku || 'SKU tidak diketahui'}
-                      </span>
-                      {shown.map((c) => (
-                        <span key={c} className="tooltip-row">
-                          <span className="line-key" style={{ background: CHANNEL_COLOR[c] }} />
-                          <span className="tooltip-value">{formatRupiah(p.byChannel[c])}</span>
-                          <span className="tooltip-label">{c}</span>
+                      <span className="rank-bar">
+                        <span className="hbar-track">
+                          <span
+                            className="hbar stack"
+                            style={{ width: `${(product.netRevenue / max) * 100}%`, '--i': i } as CSSProperties}
+                          >
+                            {shown
+                              .filter((channel) => product.byChannel[channel] > 0)
+                              .map((channel) => (
+                                <span
+                                  key={channel}
+                                  style={{ flexGrow: product.byChannel[channel], background: CHANNEL_COLOR[channel] }}
+                                />
+                              ))}
+                          </span>
                         </span>
-                      ))}
-                      <span className="tooltip-row total">
-                        <span className="line-key blank" />
-                        <span className="tooltip-value">{formatRupiah(p.netRevenue)}</span>
-                        <span className="tooltip-label">{formatNumber(p.units)} unit</span>
+                        <span className="rank-units">{formatNumber(product.units)} unit</span>
                       </span>
                     </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+                    {hover === product.key && <ProductTooltip product={product} channels={shown} above={i >= 5} />}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
         </div>
       )}
     </section>

@@ -1,168 +1,168 @@
-import { classifyStatus, normalizeChannel, parseQty, readMoney, readOrderDate } from './parse';
-import type { Channel, CleanResult, CleanRow, FormatStat, RejectedRow, SourceFile } from './types';
+import { classifyStatus, normalizeChannel, parseMoney, parseOrderDate, parseQty } from './parse';
+import type { CleanResult, CleanRow, FormatExample, RawRow, RejectedRow, SourceFile } from './types';
 
-const clean = (s: string | undefined) => (s ?? '').trim().replace(/\s+/g, ' ');
+interface ParsedRow {
+  row: CleanRow;
+  formats: FormatExample[];
+  rawChannel: string;
+}
 
-/** Rows without a recoverable SKU are grouped by their listing name instead. */
+const tidy = (text: string | undefined) => (text ?? '').trim().replace(/\s+/g, ' ');
+
 export function productKey(row: Pick<CleanRow, 'sku' | 'productName'>): string {
   return row.sku || `TANPA SKU: ${row.productName}`;
 }
 
-/** A parsed row plus the raw formats it was written in (for the data-quality report). */
-interface ParsedRow {
-  row: CleanRow;
-  seen: { field: FormatStat['field']; format: string; example: string }[];
-  rawChannel: string;
-}
-
-function parseRow(raw: Record<string, string>): ParsedRow | string {
-  const orderId = clean(raw.order_id);
+function parseRow(raw: RawRow): ParsedRow | string {
+  const orderId = tidy(raw.order_id);
   if (!orderId) return 'order_id kosong';
 
-  const date = readOrderDate(raw.order_date);
-  if (!date) return `tanggal tidak dikenali: "${clean(raw.order_date)}"`;
+  const date = parseOrderDate(raw.order_date);
+  if (!date) return `tanggal tidak dikenali: "${tidy(raw.order_date)}"`;
 
   const channel = normalizeChannel(raw.channel);
-  if (!channel) return `channel tidak dikenali: "${clean(raw.channel)}"`;
+  if (!channel) return `channel tidak dikenali: "${tidy(raw.channel)}"`;
 
   const qty = parseQty(raw.qty);
-  if (qty === null) return `qty tidak valid: "${clean(raw.qty)}"`;
+  if (qty === null) return `qty tidak valid: "${tidy(raw.qty)}"`;
 
-  const unit = readMoney(raw.unit_price);
-  if (unit === null) return `unit_price tidak valid: "${clean(raw.unit_price)}"`;
+  const unitPrice = parseMoney(raw.unit_price);
+  if (!unitPrice) return `unit_price tidak valid: "${tidy(raw.unit_price)}"`;
 
-  const total = readMoney(raw.total_price);
-  if (total === null) return `total_price tidak valid: "${clean(raw.total_price)}"`;
+  const totalPrice = parseMoney(raw.total_price);
+  if (!totalPrice) return `total_price tidak valid: "${tidy(raw.total_price)}"`;
 
-  const statusRaw = clean(raw.status);
+  const statusRaw = tidy(raw.status);
   return {
     row: {
       orderId,
       day: date.day,
       time: date.time,
       channel,
-      sku: clean(raw.sku).toUpperCase(),
+      sku: tidy(raw.sku).toUpperCase(),
       skuRecovered: false,
-      productName: clean(raw.product_name),
+      productName: tidy(raw.product_name),
       qty,
-      unitPrice: unit.value,
-      totalPrice: total.value,
+      unitPrice: unitPrice.value,
+      totalPrice: totalPrice.value,
       statusRaw,
       status: classifyStatus(statusRaw),
-      buyerCity: clean(raw.buyer_city),
+      buyerCity: tidy(raw.buyer_city),
     },
-    seen: [
-      { field: 'date', format: date.format, example: clean(raw.order_date) },
-      { field: 'money', format: unit.format, example: clean(raw.unit_price) },
-      { field: 'money', format: total.format, example: clean(raw.total_price) },
+    formats: [
+      { field: 'date', format: date.format, example: tidy(raw.order_date) },
+      { field: 'money', format: unitPrice.format, example: tidy(raw.unit_price) },
+      { field: 'money', format: totalPrice.format, example: tidy(raw.total_price) },
     ],
-    rawChannel: clean(raw.channel),
+    rawChannel: tidy(raw.channel),
   };
 }
 
-/**
- * Turns one or more marketplace exports into one clean list of order lines:
- * 1. parse and normalise every row (rows that cannot be read are rejected with a reason),
- * 2. fill in empty SKUs from other rows with the same channel + listing name,
- * 3. drop exact duplicate lines (same order, product, qty, price, status, date, city).
- */
-export function cleanRows(files: SourceFile[]): CleanResult {
-  const parsed: CleanRow[] = [];
-  const rejected: RejectedRow[] = [];
-  const formats = new Map<string, FormatStat>();
-  const spellings = new Map<string, { raw: string; channel: Channel; count: number }>();
-  let rowsRead = 0;
-
-  for (const file of files) {
-    file.rows.forEach((raw, i) => {
-      rowsRead++;
-      const result = parseRow(raw);
-      if (typeof result === 'string') {
-        rejected.push({ file: file.name, line: i + 2, reason: result });
-        return;
-      }
-      const { row } = result;
-      parsed.push(row);
-      for (const s of result.seen) {
-        const key = `${s.field}|${s.format}`;
-        const stat = formats.get(key) ?? { field: s.field, format: s.format, example: s.example, count: 0, channels: [] };
-        stat.count++;
-        if (!stat.channels.includes(row.channel)) stat.channels.push(row.channel);
-        formats.set(key, stat);
-      }
-      const spelling = spellings.get(result.rawChannel) ?? { raw: result.rawChannel, channel: row.channel, count: 0 };
-      spelling.count++;
-      spellings.set(result.rawChannel, spelling);
-    });
-  }
-
-  // Learn listing name -> SKU from rows that do have a SKU.
+function recoverSkus(rows: CleanRow[]): void {
   const byChannelName = new Map<string, Set<string>>();
   const byName = new Map<string, Set<string>>();
-  const add = (map: Map<string, Set<string>>, key: string, sku: string) => {
-    if (!map.has(key)) map.set(key, new Set());
-    map.get(key)!.add(sku);
-  };
-  for (const r of parsed) {
-    if (!r.sku) continue;
-    add(byChannelName, `${r.channel}|${r.productName.toLowerCase()}`, r.sku);
-    add(byName, r.productName.toLowerCase(), r.sku);
-  }
-  const only = (set?: Set<string>) => (set && set.size === 1 ? [...set][0] : undefined);
+  const remember = (map: Map<string, Set<string>>, key: string, sku: string) =>
+    map.set(key, (map.get(key) ?? new Set()).add(sku));
+  const onlyOne = (skus?: Set<string>) => (skus?.size === 1 ? [...skus][0] : undefined);
 
-  for (const r of parsed) {
-    if (r.sku) continue;
+  for (const row of rows) {
+    if (!row.sku) continue;
+    remember(byChannelName, `${row.channel}|${row.productName.toLowerCase()}`, row.sku);
+    remember(byName, row.productName.toLowerCase(), row.sku);
+  }
+
+  for (const row of rows) {
+    if (row.sku) continue;
     const sku =
-      only(byChannelName.get(`${r.channel}|${r.productName.toLowerCase()}`)) ??
-      only(byName.get(r.productName.toLowerCase()));
+      onlyOne(byChannelName.get(`${row.channel}|${row.productName.toLowerCase()}`)) ??
+      onlyOne(byName.get(row.productName.toLowerCase()));
     if (sku) {
-      r.sku = sku;
-      r.skuRecovered = true;
+      row.sku = sku;
+      row.skuRecovered = true;
     }
   }
+}
 
+function removeDuplicates(rows: CleanRow[]): { unique: CleanRow[]; duplicateValue: number } {
   const seen = new Set<string>();
-  const rows: CleanRow[] = [];
+  const unique: CleanRow[] = [];
   let duplicateValue = 0;
-  for (const r of parsed) {
+
+  for (const row of rows) {
     const key = [
-      r.orderId, r.channel, r.day, r.time, r.sku, r.productName,
-      r.qty, r.unitPrice, r.totalPrice, r.statusRaw.toLowerCase(), r.buyerCity,
+      row.orderId,
+      row.channel,
+      row.day,
+      row.time,
+      row.sku,
+      row.productName,
+      row.qty,
+      row.unitPrice,
+      row.totalPrice,
+      row.statusRaw.toLowerCase(),
+      row.buyerCity,
     ].join('|');
+
     if (seen.has(key)) {
-      if (r.status === 'counted') duplicateValue += r.totalPrice;
+      if (row.status === 'counted') duplicateValue += row.totalPrice;
       continue;
     }
     seen.add(key);
-    rows.push(r);
+    unique.push(row);
+  }
+  return { unique, duplicateValue };
+}
+
+function shortestNames(rows: CleanRow[]): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const row of rows) {
+    const key = productKey(row);
+    const current = names[key];
+    const shorter = current === undefined || row.productName.length < current.length;
+    const sameLengthFirst = row.productName.length === current?.length && row.productName < current;
+    if (shorter || sameLengthFirst) names[key] = row.productName;
+  }
+  return names;
+}
+
+export function cleanRows(files: SourceFile[]): CleanResult {
+  const parsed: CleanRow[] = [];
+  const rejected: RejectedRow[] = [];
+  const formats = new Map<string, FormatExample>();
+  const spellings = new Set<string>();
+  let rowsRead = 0;
+
+  for (const file of files) {
+    file.rows.forEach((raw, index) => {
+      rowsRead++;
+      const result = parseRow(raw);
+      if (typeof result === 'string') {
+        rejected.push({ file: file.name, line: index + 2, reason: result });
+        return;
+      }
+      parsed.push(result.row);
+      spellings.add(result.rawChannel);
+      for (const format of result.formats) {
+        const key = `${format.field}|${format.format}`;
+        if (!formats.has(key)) formats.set(key, format);
+      }
+    });
   }
 
-  // Display name per product: the shortest listing name across marketplaces.
-  const productNames: Record<string, string> = {};
-  for (const r of rows) {
-    const key = productKey(r);
-    const current = productNames[key];
-    if (
-      current === undefined ||
-      r.productName.length < current.length ||
-      (r.productName.length === current.length && r.productName < current)
-    ) {
-      productNames[key] = r.productName;
-    }
-  }
+  recoverSkus(parsed);
+  const { unique, duplicateValue } = removeDuplicates(parsed);
 
   return {
-    rows,
+    rows: unique,
     rowsRead,
     rejected,
-    duplicatesRemoved: parsed.length - rows.length,
-    // Counted on the clean lines (after duplicates are removed), so a duplicate is not counted twice.
-    skuMissing: rows.filter((r) => r.skuRecovered || !r.sku).length,
-    skuRecovered: rows.filter((r) => r.skuRecovered).length,
-    priceMismatches: rows.filter((r) => r.qty * r.unitPrice !== r.totalPrice).length,
+    duplicatesRemoved: parsed.length - unique.length,
     duplicateValue,
-    productNames,
-    formats: [...formats.values()].sort((a, b) => a.field.localeCompare(b.field) || b.count - a.count),
-    channelSpellings: [...spellings.values()].sort((a, b) => a.channel.localeCompare(b.channel) || b.count - a.count),
+    skuMissing: unique.filter((row) => row.skuRecovered || !row.sku).length,
+    skuRecovered: unique.filter((row) => row.skuRecovered).length,
+    priceMismatches: unique.filter((row) => row.qty * row.unitPrice !== row.totalPrice).length,
+    productNames: shortestNames(unique),
+    formats: [...formats.values()],
+    channelSpellings: [...spellings],
   };
 }

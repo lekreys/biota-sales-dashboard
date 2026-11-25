@@ -1,23 +1,39 @@
 import { formatNumber, formatRupiah } from '../lib/format';
 import type { Summary } from '../lib/metrics';
-import type { CleanResult } from '../lib/types';
+import { CHANNELS } from '../lib/types';
+import type { CleanResult, StatusCategory } from '../lib/types';
 import { DownloadIcon } from './Icons';
 
 interface Props {
   cleaned: CleanResult;
-  file: Summary; // the whole file, no filters
+  file: Summary;
   onDownload: () => void;
 }
 
-/** How the file became the numbers, in plain words. */
+function Examples({ values }: { values: string[] }) {
+  return (
+    <>
+      {values.map((value) => (
+        <span key={value}>
+          <code>{value}</code>{' '}
+        </span>
+      ))}
+    </>
+  );
+}
+
 export function DataTab({ cleaned, file, onDownload }: Props) {
-  const counted = cleaned.rows.length - file.excludedLines;
-  const dateExamples = cleaned.formats.filter((f) => f.field === 'date').map((f) => f.example);
-  const moneyExamples = cleaned.formats.filter((f) => f.field === 'money').map((f) => f.example);
-  const statuses = (category: string) =>
-    file.statuses.filter((s) => s.category === category).map((s) => s.statusRaw).join(', ');
-  const excludedStatuses = file.statuses.filter((s) => s.category === 'cancelled' || s.category === 'returned');
-  const unknown = file.statuses.filter((s) => s.category === 'unknown');
+  const countedLines = cleaned.rows.length - file.excludedLines;
+  const examplesOf = (field: 'date' | 'money') =>
+    cleaned.formats.filter((format) => format.field === field).map((format) => format.example);
+  const statusesIn = (...categories: StatusCategory[]) =>
+    file.statuses
+      .filter((status) => categories.includes(status.category))
+      .map((status) => status.statusRaw)
+      .join(', ');
+  const otherSpellings = cleaned.channelSpellings.filter((spelling) => !(CHANNELS as string[]).includes(spelling));
+  const unknownStatuses = statusesIn('unknown');
+  const hasWarnings = cleaned.rejected.length > 0 || cleaned.priceMismatches > 0 || unknownStatuses !== '';
 
   return (
     <div className="data-tab">
@@ -50,7 +66,7 @@ export function DataTab({ cleaned, file, onDownload }: Props) {
           </div>
           <div className="subtotal">
             <dt>Baris dihitung</dt>
-            <dd>{formatNumber(counted)}</dd>
+            <dd>{formatNumber(countedLines)}</dd>
           </div>
         </dl>
 
@@ -68,51 +84,48 @@ export function DataTab({ cleaned, file, onDownload }: Props) {
         <h2>Yang dibersihkan otomatis</h2>
         <ul className="cleaned">
           <li>
-            <strong>Nama channel.</strong> {cleaned.channelSpellings.length} cara penulisan (misalnya <code>SHOPEE</code>,{' '}
-            <code>Tiktok</code>, <code>Tokped</code>) disatukan jadi 3 channel.
+            <strong>Nama channel.</strong> {cleaned.channelSpellings.length} cara penulisan
+            {otherSpellings.length > 0 && (
+              <>
+                {' '}
+                (misalnya <Examples values={otherSpellings.slice(0, 3)} />)
+              </>
+            )}{' '}
+            disatukan jadi {CHANNELS.length} channel.
           </li>
           <li>
-            <strong>Tanggal.</strong> Tiap marketplace beda format:{' '}
-            {dateExamples.map((e) => (
-              <span key={e}>
-                <code>{e}</code>{' '}
-              </span>
-            ))}
-            Tanggal TikTok dibaca tanggal dulu baru bulan.
+            <strong>Tanggal.</strong> <Examples values={examplesOf('date')} />
+            Tanggal dengan garis miring dibaca tanggal dulu baru bulan.
           </li>
           <li>
-            <strong>Harga.</strong>{' '}
-            {moneyExamples.map((e) => (
-              <span key={e}>
-                <code>{e}</code>{' '}
-              </span>
-            ))}
+            <strong>Harga.</strong> <Examples values={examplesOf('money')} />
             semua dibaca sebagai rupiah biasa.
           </li>
           <li>
-            <strong>SKU kosong.</strong> {formatNumber(cleaned.skuRecovered)} dari {formatNumber(cleaned.skuMissing)} baris
-            dipulihkan dari nama produknya.
+            <strong>SKU kosong.</strong> {formatNumber(cleaned.skuRecovered)} dari {formatNumber(cleaned.skuMissing)}{' '}
+            baris dipulihkan dari nama produknya.
           </li>
           <li>
-            <strong>Duplikat.</strong> {formatNumber(cleaned.duplicatesRemoved)} baris yang sama persis dibuang. Kalau tidak,
-            net revenue jadi lebih besar {formatRupiah(cleaned.duplicateValue)}.
+            <strong>Duplikat.</strong> {formatNumber(cleaned.duplicatesRemoved)} baris yang sama persis dibuang. Kalau
+            tidak, net revenue jadi lebih besar {formatRupiah(cleaned.duplicateValue)}.
           </li>
           <li>
-            <strong>Status.</strong> Dihitung: {statuses('counted')}. Tidak dihitung:{' '}
-            {excludedStatuses.map((s) => s.statusRaw).join(', ')}.
+            <strong>Status.</strong> Dihitung: {statusesIn('counted')}. Tidak dihitung:{' '}
+            {statusesIn('cancelled', 'returned')}.
           </li>
         </ul>
 
-        {(cleaned.rejected.length > 0 || unknown.length > 0) && (
+        {hasWarnings && (
           <div className="alert">
-            {cleaned.rejected.slice(0, 5).map((r) => (
-              <p key={`${r.file}-${r.line}`}>
-                {r.file} baris {r.line}: {r.reason}
+            {cleaned.rejected.slice(0, 5).map((row) => (
+              <p key={`${row.file}-${row.line}`}>
+                {row.file} baris {row.line}: {row.reason}
               </p>
             ))}
-            {unknown.length > 0 && (
-              <p>Status belum dikenal, belum dihitung: {unknown.map((s) => s.statusRaw).join(', ')}</p>
+            {cleaned.priceMismatches > 0 && (
+              <p>{cleaned.priceMismatches} baris dengan qty × harga ≠ total. Yang dipakai adalah total.</p>
             )}
+            {unknownStatuses && <p>Status belum dikenal, belum dihitung: {unknownStatuses}</p>}
           </div>
         )}
       </section>

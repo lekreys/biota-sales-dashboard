@@ -1,26 +1,27 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 
-export interface TabDef<T extends string> {
-  id: T;
-  label: string;
-}
-
 interface Props<T extends string> {
-  tabs: TabDef<T>[];
+  tabs: { id: T; label: string }[];
   active: T;
   onChange: (id: T) => void;
 }
 
-/** Accessible tab list (arrow keys, Home/End) with a sliding indicator behind the active tab. */
 export function Tabs<T extends string>({ tabs, active, onChange }: Props<T>) {
-  const refs = useRef<Partial<Record<T, HTMLButtonElement | null>>>({});
+  const buttons = useRef<Partial<Record<T, HTMLButtonElement | null>>>({});
   const [indicator, setIndicator] = useState({ left: 0, top: 0, width: 0, height: 0 });
 
   useLayoutEffect(() => {
     const update = () => {
-      const el = refs.current[active];
-      if (el) setIndicator({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight });
+      const button = buttons.current[active];
+      if (button) {
+        setIndicator({
+          left: button.offsetLeft,
+          top: button.offsetTop,
+          width: button.offsetWidth,
+          height: button.offsetHeight,
+        });
+      }
     };
     update();
     window.addEventListener('resize', update);
@@ -28,23 +29,22 @@ export function Tabs<T extends string>({ tabs, active, onChange }: Props<T>) {
   }, [active, tabs]);
 
   function onKeyDown(e: KeyboardEvent) {
-    const i = tabs.findIndex((t) => t.id === active);
-    const keys: Record<string, number> = {
-      ArrowRight: (i + 1) % tabs.length,
-      ArrowLeft: (i - 1 + tabs.length) % tabs.length,
+    const current = tabs.findIndex((tab) => tab.id === active);
+    const targets: Record<string, number> = {
+      ArrowRight: (current + 1) % tabs.length,
+      ArrowLeft: (current - 1 + tabs.length) % tabs.length,
       Home: 0,
       End: tabs.length - 1,
     };
-    if (!(e.key in keys)) return;
+    if (!(e.key in targets)) return;
     e.preventDefault();
-    const next = tabs[keys[e.key]].id;
+    const next = tabs[targets[e.key]].id;
     onChange(next);
-    refs.current[next]?.focus();
+    buttons.current[next]?.focus();
   }
 
   return (
     <div className="tabs" role="tablist" aria-label="Bagian dashboard" onKeyDown={onKeyDown}>
-      {/* The indicator box covers the active tab; CSS draws it as an underline. */}
       <span
         className="tab-indicator"
         style={{
@@ -54,21 +54,21 @@ export function Tabs<T extends string>({ tabs, active, onChange }: Props<T>) {
         }}
         aria-hidden
       />
-      {tabs.map((t) => (
+      {tabs.map((tab) => (
         <button
-          key={t.id}
+          key={tab.id}
           ref={(el) => {
-            refs.current[t.id] = el;
+            buttons.current[tab.id] = el;
           }}
           role="tab"
-          id={`tab-${t.id}`}
-          aria-controls={`panel-${t.id}`}
-          aria-selected={t.id === active}
-          tabIndex={t.id === active ? 0 : -1}
-          className={`tab${t.id === active ? ' active' : ''}`}
-          onClick={() => onChange(t.id)}
+          id={`tab-${tab.id}`}
+          aria-controls={`panel-${tab.id}`}
+          aria-selected={tab.id === active}
+          tabIndex={tab.id === active ? 0 : -1}
+          className={`tab${tab.id === active ? ' active' : ''}`}
+          onClick={() => onChange(tab.id)}
         >
-          {t.label}
+          {tab.label}
         </button>
       ))}
     </div>

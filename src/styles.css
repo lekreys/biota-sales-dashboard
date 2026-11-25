@@ -1,9 +1,3 @@
-/* =========================================================
-   Tokens. Warm paper neutrals; one colour per marketplace.
-   Channel colours follow the marketplaces' own brand hues
-   (Shopee orange, TikTok ink, Tokopedia green), stepped so the
-   three stay apart for colour-blind readers (validated light + dark).
-   ========================================================= */
 :root {
   color-scheme: light;
   --font: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -18,9 +12,9 @@
   --grid: #e6e2d9;
   --axis: #cbc6ba;
   --line: rgba(28, 27, 24, 0.11);
-  --series-1: #d45a2a; /* Shopee */
-  --series-2: #3f62a8; /* TikTok Shop */
-  --series-3: #1d9a72; /* Tokopedia */
+  --series-1: #d45a2a;
+  --series-2: #3f62a8;
+  --series-3: #1d9a72;
   --critical: #c23b32;
   --critical-wash: rgba(194, 59, 50, 0.08);
   --button-bg: #1c1b18;
@@ -78,7 +72,6 @@
   --pop: 0 10px 28px rgba(0, 0, 0, 0.55);
 }
 
-/* ========================= Base ========================= */
 * {
   box-sizing: border-box;
 }
@@ -172,7 +165,6 @@ code {
   white-space: nowrap;
 }
 
-/* ========================= Shell ========================= */
 .shell {
   min-height: 100dvh;
   display: flex;
@@ -258,7 +250,9 @@ code {
   border: 1px solid var(--line);
   background: transparent;
   color: var(--ink-2);
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .icon-button:hover {
@@ -266,7 +260,6 @@ code {
   color: var(--ink);
 }
 
-/* Tabs: text tabs with a sliding underline */
 .tabs {
   position: relative;
   display: flex;
@@ -278,7 +271,10 @@ code {
   top: 0;
   left: 0;
   pointer-events: none;
-  transition: transform 0.3s var(--ease), width 0.3s var(--ease), height 0.3s var(--ease);
+  transition:
+    transform 0.3s var(--ease),
+    width 0.3s var(--ease),
+    height 0.3s var(--ease);
 }
 
 .tab-indicator::after {
@@ -305,7 +301,9 @@ code {
   font-weight: 550;
   font-size: 0.9rem;
   white-space: nowrap;
-  transition: color 0.15s, background-color 0.15s;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .tab:hover {
@@ -318,8 +316,7 @@ code {
   font-weight: 700;
 }
 
-/* Filter row */
-.filter-row {
+.filter-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -361,7 +358,9 @@ code {
   border-radius: 6px;
   color: var(--ink-2);
   font-size: 0.84rem;
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .segmented button:hover {
@@ -387,7 +386,6 @@ code {
 }
 
 .date-range input,
-
 .chip-toggle {
   display: inline-flex;
   align-items: center;
@@ -398,7 +396,10 @@ code {
   padding: 0.22rem 0.65rem;
   font-size: 0.84rem;
   color: var(--ink-2);
-  transition: background-color 0.15s, color 0.15s, opacity 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
 }
 
 .chip-toggle.on {
@@ -462,7 +463,6 @@ code {
   font-size: 0.82rem;
 }
 
-/* Main area */
 .main {
   flex: 1;
   padding: 14px 20px 18px;
@@ -501,7 +501,6 @@ code {
   align-content: start;
 }
 
-/* ========================= Cards ========================= */
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -541,7 +540,9 @@ code {
   padding: 0.5rem 0.95rem;
   font-size: 0.88rem;
   font-weight: 650;
-  transition: transform 0.12s var(--ease), opacity 0.15s;
+  transition:
+    transform 0.12s var(--ease),
+    opacity 0.15s;
 }
 
 .button:active {
@@ -597,7 +598,6 @@ code {
   overflow: auto;
 }
 
-/* ========================= KPI strip ========================= */
 .kpi-strip {
   display: grid;
   grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
@@ -650,7 +650,6 @@ code {
   font-weight: 650;
 }
 
-/* ========================= Daily chart ========================= */
 .trend-card {
   display: flex;
   flex-direction: column;
@@ -710,7 +709,9 @@ code {
   background: var(--wash);
   border-left: 1px solid var(--axis);
   border-right: 1px solid var(--axis);
-  transition: left 0.25s var(--ease), width 0.25s var(--ease);
+  transition:
+    left 0.25s var(--ease),
+    width 0.25s var(--ease);
 }
 
 .band.live {
@@ -743,7 +744,9 @@ code {
   align-items: flex-end;
   justify-content: center;
   height: 100%;
-  transition: opacity 0.2s var(--ease), background-color 0.12s;
+  transition:
+    opacity 0.2s var(--ease),
+    background-color 0.12s;
 }
 
 .trend-col.dim {
@@ -784,7 +787,6 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
-/* ========================= Tooltip ========================= */
 .tooltip {
   position: absolute;
   top: 4px;
@@ -855,7 +857,6 @@ code {
   white-space: nowrap;
 }
 
-/* ========================= Channels ========================= */
 .channel-panel {
   display: flex;
   flex-direction: column;
@@ -881,7 +882,10 @@ code {
   background: transparent;
   border-radius: 8px;
   padding: 9px 10px;
-  transition: background-color 0.15s, opacity 0.2s var(--ease), border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    opacity 0.2s var(--ease),
+    border-color 0.15s;
 }
 
 .channel-row:hover {
@@ -934,7 +938,6 @@ code {
   min-height: 24px;
 }
 
-/* ========================= Top 10 & product table ========================= */
 .fill-card {
   display: flex;
   flex-direction: column;
@@ -959,7 +962,10 @@ code {
   background: transparent;
   border-radius: 8px;
   padding: 6px 8px;
-  transition: background-color 0.15s, opacity 0.2s var(--ease), border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    opacity 0.2s var(--ease),
+    border-color 0.15s;
 }
 
 .rank-row:hover {
@@ -1156,7 +1162,6 @@ tbody tr.selected {
   background: var(--ink-2);
 }
 
-/* ========================= Data tab ========================= */
 .data-tab {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
@@ -1264,7 +1269,6 @@ tbody tr.selected {
   font-size: 0.85rem;
 }
 
-/* ========================= Empty state ========================= */
 .empty {
   margin: auto;
   width: 100%;
@@ -1349,7 +1353,6 @@ tbody tr.selected {
   margin-top: 18px;
 }
 
-/* ========================= Toast & drop overlay ========================= */
 .toast {
   position: fixed;
   right: 16px;
@@ -1388,7 +1391,6 @@ tbody tr.selected {
   font-size: 1.1rem;
 }
 
-/* ========================= Chart extras ========================= */
 .legend-line {
   display: inline-flex;
   align-items: center;
@@ -1475,17 +1477,15 @@ tbody tr.selected {
 
 .split span {
   border-radius: 2px;
-  transition: flex-grow 0.4s var(--ease), opacity 0.2s;
+  transition:
+    flex-grow 0.4s var(--ease),
+    opacity 0.2s;
 }
 
 .split span.off {
   opacity: 0.25;
 }
 
-/* =========================================================
-   Fit-to-screen: on a laptop or desktop each tab fits in one
-   screen; long tables scroll inside their own card instead.
-   ========================================================= */
 @media (min-width: 1024px) and (min-height: 620px) {
   .shell {
     height: 100dvh;
@@ -1523,7 +1523,6 @@ tbody tr.selected {
   }
 }
 
-/* ========================= Smaller screens ========================= */
 @media (max-width: 1023px), (max-height: 619px) {
   .scroll-area {
     max-height: 70vh;
@@ -1586,7 +1585,7 @@ tbody tr.selected {
   }
 
   .topbar,
-  .filter-row,
+  .filter-bar,
   .main {
     padding-left: 12px;
     padding-right: 12px;
@@ -1605,7 +1604,7 @@ tbody tr.selected {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .filter-row {
+  .filter-bar {
     gap: 10px;
   }
 

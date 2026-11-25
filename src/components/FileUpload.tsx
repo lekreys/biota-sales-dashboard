@@ -1,8 +1,9 @@
 import { useRef } from 'react';
+import type { RefObject } from 'react';
 import type { SourceFile } from '../lib/types';
 import { CloseIcon, FileIcon, UploadIcon } from './Icons';
 
-function FileInput({ inputRef, onFiles }: { inputRef: React.RefObject<HTMLInputElement>; onFiles: (f: File[]) => void }) {
+function FileInput({ inputRef, onFiles }: { inputRef: RefObject<HTMLInputElement>; onFiles: (files: File[]) => void }) {
   return (
     <input
       ref={inputRef}
@@ -18,12 +19,12 @@ function FileInput({ inputRef, onFiles }: { inputRef: React.RefObject<HTMLInputE
   );
 }
 
-/** First screen, before any data: what the app does + where to drop the CSV. */
-export function EmptyState({ onFiles, onSample }: { onFiles: (f: File[]) => void; onSample: () => void }) {
+export function EmptyState({ onFiles, onSample }: { onFiles: (files: File[]) => void; onSample: () => void }) {
   const input = useRef<HTMLInputElement>(null);
+
   return (
     <section className="empty">
-      <div className="empty-copy">
+      <div>
         <h1>Ekspor marketplace jadi angka yang bisa dipercaya.</h1>
         <ol className="steps">
           <li>
@@ -38,6 +39,7 @@ export function EmptyState({ onFiles, onSample }: { onFiles: (f: File[]) => void
         </ol>
         <p className="secondary small">File diproses di browser kamu dan tidak dikirim ke server mana pun.</p>
       </div>
+
       <div className="dropzone">
         <span className="dropzone-icon">
           <UploadIcon />
@@ -58,18 +60,29 @@ export function EmptyState({ onFiles, onSample }: { onFiles: (f: File[]) => void
   );
 }
 
-/** Compact file controls in the top bar once data is loaded. */
-export function FileActions({ files, onFiles, onReset }: { files: SourceFile[]; onFiles: (f: File[]) => void; onReset: () => void }) {
+interface FileActionsProps {
+  files: SourceFile[];
+  onFiles: (files: File[]) => void;
+  onReset: () => void;
+}
+
+export function FileActions({ files, onFiles, onReset }: FileActionsProps) {
   const input = useRef<HTMLInputElement>(null);
-  const rows = files.reduce((a, f) => a + f.rows.length, 0);
+  const rowCount = files.reduce((sum, file) => sum + file.rows.length, 0);
+
   return (
     <div className="file-actions">
-      <span className="file-chip" title={files.map((f) => `${f.name} (${f.rows.length} baris)`).join('\n')}>
+      <span className="file-chip" title={files.map((file) => `${file.name} (${file.rows.length} baris)`).join('\n')}>
         <FileIcon />
         <span className="file-name">{files.length === 1 ? files[0].name : `${files.length} file`}</span>
-        <span className="muted">· {rows} baris</span>
+        <span className="muted">· {rowCount} baris</span>
       </span>
-      <button className="icon-button" onClick={() => input.current?.click()} title="Tambah CSV" aria-label="Tambah file CSV">
+      <button
+        className="icon-button"
+        onClick={() => input.current?.click()}
+        title="Tambah CSV"
+        aria-label="Tambah file CSV"
+      >
         <UploadIcon />
       </button>
       <button className="icon-button" onClick={onReset} title="Hapus semua data" aria-label="Hapus semua data">

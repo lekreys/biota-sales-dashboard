@@ -100,6 +100,8 @@ Butuh [Node.js](https://nodejs.org) versi 18 atau lebih baru.
 npm install
 npm run dev      # jalankan di http://localhost:5173
 npm test         # semua pengecekan, termasuk cek silang dengan skrip Python
+npm run lint     # cek format kode (Prettier) dan tipe (TypeScript)
+npm run format   # rapikan format kode
 npm run verify   # hitung ulang angka dengan Python (butuh python3)
 ```
 
