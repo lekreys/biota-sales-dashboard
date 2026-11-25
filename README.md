@@ -41,14 +41,13 @@ Nama produk berbeda di tiap marketplace; yang ditampilkan adalah nama listing te
 1. Buka link live di atas.
 2. Tarik file CSV ke kotak upload, atau klik **Pilih file CSV**. Bisa satu file gabungan atau beberapa file sekaligus
    (misalnya satu file per marketplace). Untuk mencoba cepat, klik **Pakai data contoh (Okt 2026)**.
-3. Dashboard punya empat tab. Di laptop/desktop setiap tab muat dalam satu layar:
-   - **Ringkasan:** net revenue, jumlah pesanan, unit, rata-rata per pesanan, grafik net revenue harian per channel
-     (dengan garis rata-rata 7 hari), dan net revenue per channel.
-   - **Produk:** 10 produk teratas (dengan porsi tiap channel) dan tabel semua produk yang bisa dicari dan diurutkan.
-   - **Kualitas data:** perjalanan data dari file ke angka (495 baris dibaca → 473 bersih → 393 dihitung), contoh
-     setiap format yang disatukan, dan cara setiap status diperlakukan.
-   - **Data bersih:** semua baris setelah dibersihkan, bisa dicari, difilter per status, dan diunduh sebagai CSV.
-4. Filter di bawah tab berlaku untuk semua tab:
+3. Dashboard punya tiga tab. Di laptop/desktop setiap tab muat dalam satu layar:
+   - **Ringkasan:** net revenue, jumlah pesanan, unit terjual, grafik net revenue harian per channel (dengan garis
+     rata-rata 7 hari), dan net revenue per channel.
+   - **Produk:** 10 produk teratas (dengan porsi tiap channel) dan tabel net revenue semua produk.
+   - **Data:** hitungan dari file ke angka (495 baris → 473 bersih → 393 dihitung), apa saja yang dibersihkan
+     otomatis, dan tombol untuk mengunduh data bersih sebagai CSV.
+4. Filter di bawah tab berlaku untuk tab Ringkasan dan Produk:
    - **Periode:** tombol **1–15 Okt** / **16–31 Okt**, isi tanggal sendiri, atau **geser (drag) di grafik harian**.
      Klik satu batang untuk melihat satu hari, lalu klik lagi untuk kembali. Kedua tanggal ikut dihitung.
    - **Channel:** klik channel di panel channel untuk melihat channel itu saja, atau nyalakan/matikan di baris filter.
@@ -143,13 +142,13 @@ bisa di-import ke Vercel atau Netlify tanpa perubahan (build `npm run build`, ou
 6. **Setiap angka di dashboard dicocokkan dengan hitungan Python.** `src/lib/crosscheck.test.ts` menjalankan skrip
    Python untuk 8 skenario filter (semua data, 1–15 Okt, 16–31 Okt, satu hari, Shopee saja, dua channel + rentang
    tanggal, satu produk, satu produk di satu channel + rentang tanggal). Untuk setiap skenario, semua angka harus sama
-   persis: net revenue, pesanan, unit, rata-rata per pesanan, nilai yang tidak dihitung, tiap channel, tiap produk
-   (beserta porsi per channel), dan setiap hari di grafik harian. Test ini ikut berjalan sebelum setiap deploy.
-   Empat rumus sengaja dirusak (tanggal akhir eksklusif, unit dari semua status, pembulatan rata-rata ke bawah, retur
-   ikut dihitung di grafik), dan setiap kali test langsung gagal.
+   persis: net revenue, pesanan, unit, baris yang tidak dihitung, tiap channel, tiap produk (beserta porsi per
+   channel), dan setiap hari di grafik harian. Test ini ikut berjalan sebelum setiap deploy. Rumus sengaja dirusak
+   (tanggal akhir eksklusif, unit dari semua status, retur ikut dihitung di grafik), dan setiap kali test langsung
+   gagal.
 7. **Angka di layar ikut dicek.** Robot browser mengatur ke-8 skenario lewat filter di layar, lalu membaca angka
-   yang benar-benar tampil (kartu, panel channel, tabel produk, Top 10, tabel harian). Hasilnya 318 angka, semua sama
-   dengan hitungan Python.
+   yang benar-benar tampil (angka utama, panel channel, tabel produk, Top 10, tabel harian). Hasilnya 310 angka,
+   semua sama dengan hitungan Python.
 
 ## Tiga hal yang salah dikerjakan AI
 
@@ -193,7 +192,7 @@ src/lib/clean.ts      Menggabungkan file, memulihkan SKU, membuang duplikat
 src/lib/metrics.ts    Filter (tanggal, channel, produk), hitungan net revenue, data harian
 src/lib/csv.ts        Membaca CSV dan membuat CSV data bersih
 src/lib/*.test.ts     Test: aturan pembersihan, angka akhir, dan cek silang dengan Python
-src/components/       Tampilan dashboard (tab, filter, angka utama, grafik, tabel, kualitas data)
+src/components/       Tampilan dashboard (tab, filter, angka utama, grafik, tabel, tab Data)
 src/hooks/            Animasi angka saat filter berubah
 scripts/verify_numbers.py   Hitungan kedua (Python) untuk cek silang
 data/                 File ekspor Oktober 2026

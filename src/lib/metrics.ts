@@ -66,9 +66,7 @@ export interface Summary {
   netRevenue: number;
   orders: number;
   units: number;
-  averageOrderValue: number; // net revenue / orders, rounded to whole rupiah
-  excludedValue: number; // total_price of cancelled, returned and unknown-status lines
-  excludedLines: number;
+  excludedLines: number; // cancelled, returned and unknown-status lines (not counted)
   byChannel: ChannelSummary[];
   byProduct: ProductSummary[];
   excluded: Record<Exclude<StatusCategory, 'counted'>, { lines: number; value: number }>;
@@ -132,8 +130,6 @@ export function summarize(rows: CleanRow[], productNames: Record<string, string>
     netRevenue,
     orders,
     units: sum(counted.map((r) => r.qty)),
-    averageOrderValue: orders ? Math.round(netRevenue / orders) : 0,
-    excludedValue: excluded.cancelled.value + excluded.returned.value + excluded.unknown.value,
     excludedLines: excluded.cancelled.lines + excluded.returned.lines + excluded.unknown.lines,
     byChannel,
     byProduct,

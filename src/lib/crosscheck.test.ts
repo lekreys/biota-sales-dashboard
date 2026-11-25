@@ -78,8 +78,6 @@ describe.skipIf(output === null)('dashboard numbers = independent Python impleme
           net: all.netRevenue,
           orders: all.orders,
           units: all.units,
-          average: all.averageOrderValue,
-          excluded_value: all.excludedValue,
           excluded_lines: all.excludedLines,
         }).toEqual(s.totals);
       });

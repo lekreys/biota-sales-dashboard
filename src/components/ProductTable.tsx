@@ -11,14 +11,10 @@ interface Props {
 }
 
 export function ProductTable({ products, selected, onSelect }: Props) {
-  const [query, setQuery] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'netRevenue', dir: -1 });
   const total = products.reduce((a, p) => a + p.netRevenue, 0);
 
-  const q = query.trim().toLowerCase();
-  const rows = products
-    .filter((p) => !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q))
-    .sort((a, b) => {
+  const rows = [...products].sort((a, b) => {
       const d = sort.key === 'name' ? a.name.localeCompare(b.name) : a[sort.key] - b[sort.key];
       return d * sort.dir || b.netRevenue - a.netRevenue;
     });
@@ -47,14 +43,6 @@ export function ProductTable({ products, selected, onSelect }: Props) {
             {products.length} produk · klik judul kolom untuk mengurutkan
           </p>
         </div>
-        <input
-          className="search"
-          type="search"
-          placeholder="Cari produk atau SKU…"
-          aria-label="Cari produk"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
       </div>
       <div className="scroll-area">
         <table>

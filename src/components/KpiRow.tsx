@@ -19,7 +19,7 @@ interface Props {
   scopeLabel: string;
 }
 
-/** One strip: the headline number and four supporting figures. */
+/** One strip: the headline number and two supporting figures. */
 export function KpiRow({ summary, periodLabel, scopeLabel }: Props) {
   return (
     <section className="card kpi-strip">
@@ -48,20 +48,6 @@ export function KpiRow({ summary, periodLabel, scopeLabel }: Props) {
           <Animated value={summary.units} format={formatNumber} />
         </p>
         <p className="secondary small">dari pesanan dihitung</p>
-      </div>
-      <div className="kpi">
-        <p className="label">Rata-rata / pesanan</p>
-        <p className="kpi-value">
-          <Animated value={summary.averageOrderValue} format={formatRupiah} />
-        </p>
-        <p className="secondary small">net revenue ÷ pesanan</p>
-      </div>
-      <div className="kpi">
-        <p className="label">Tidak dihitung</p>
-        <p className="kpi-value muted-value">
-          <Animated value={summary.excludedValue} format={formatRupiah} />
-        </p>
-        <p className="secondary small">{formatNumber(summary.excludedLines)} baris batal / retur</p>
       </div>
     </section>
   );

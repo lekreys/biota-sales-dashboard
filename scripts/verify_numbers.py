@@ -153,8 +153,6 @@ def scenario(rows, f, first_day, last_day):
     excluded = [r for r in selected if r["status"] not in COUNTED]
     net = sum(r["total"] for r in counted)
     orders = len({(r["channel"], r["order_id"]) for r in counted})
-    # Same rounding as JavaScript Math.round for positive numbers (round half up).
-    average = (2 * net + orders) // (2 * orders) if orders else 0
 
     # Channel panel ignores the channel filter, product panel ignores the product filter,
     # daily chart ignores the date filter (they highlight the selection instead).
@@ -186,8 +184,8 @@ def scenario(rows, f, first_day, last_day):
     return {
         "name": f["name"],
         "filter": {k: f[k] for k in ("from", "to", "channels", "product")},
-        "totals": {"net": net, "orders": orders, "units": sum(r["qty"] for r in counted), "average": average,
-                   "excluded_value": sum(r["total"] for r in excluded), "excluded_lines": len(excluded)},
+        "totals": {"net": net, "orders": orders, "units": sum(r["qty"] for r in counted),
+                   "excluded_lines": len(excluded)},
         "channels": channels,
         "products": products,
         "daily": daily,

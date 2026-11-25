@@ -1,10 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent } from 'react';
 
 export interface TabDef<T extends string> {
   id: T;
   label: string;
-  badge?: ReactNode;
 }
 
 interface Props<T extends string> {
@@ -70,7 +69,6 @@ export function Tabs<T extends string>({ tabs, active, onChange }: Props<T>) {
           onClick={() => onChange(t.id)}
         >
           {t.label}
-          {t.badge !== undefined && <span className="tab-badge">{t.badge}</span>}
         </button>
       ))}
     </div>

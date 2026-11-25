@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
 import { ChannelCards } from './components/ChannelCards';
-import { CleanDataTable } from './components/CleanDataTable';
-import { DataQuality } from './components/DataQuality';
+import { DataTab } from './components/DataTab';
 import { FilterBar } from './components/FilterBar';
 import { CloseIcon, LogoMark, MoonIcon, SunIcon } from './components/Icons';
 import { KpiRow } from './components/KpiRow';
@@ -13,7 +12,7 @@ import { TrendChart } from './components/TrendChart';
 import { EmptyState, FileActions } from './components/UploadArea';
 import { cleanRows } from './lib/clean';
 import { readCsv, toCsv } from './lib/csv';
-import { formatDay, formatNumber } from './lib/format';
+import { formatDay } from './lib/format';
 import { applyFilters, dailyRevenue, NO_FILTERS, summarize } from './lib/metrics';
 import type { Filters } from './lib/metrics';
 import { CHANNELS } from './lib/types';
@@ -21,7 +20,7 @@ import type { Channel, SourceFile } from './lib/types';
 
 type Theme = 'light' | 'dark' | null; // null = follow the operating system
 
-const TAB_IDS = ['ringkasan', 'produk', 'kualitas-data', 'data'] as const;
+const TAB_IDS = ['ringkasan', 'produk', 'data'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 function storedTheme(): Theme {
@@ -140,22 +139,15 @@ export default function App() {
     .join(' · ');
 
   function download() {
-    if (!view) return;
-    const blob = new Blob([toCsv(view.rows)], { type: 'text/csv;charset=utf-8' });
+    if (!cleaned) return;
+    const blob = new Blob([toCsv(cleaned.rows)], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `data_bersih_${filters.from || bounds?.min}_sd_${filters.to || bounds?.max}.csv`;
+    a.download = `data_bersih_${bounds?.min}_sd_${bounds?.max}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  const issues = cleaned
-    ? cleaned.rejected.length +
-      cleaned.priceMismatches +
-      (cleaned.skuMissing - cleaned.skuRecovered) +
-      cleaned.rows.filter((r) => r.status === 'unknown').length
-    : 0;
 
   return (
     <div
@@ -192,9 +184,8 @@ export default function App() {
             onChange={setTab}
             tabs={[
               { id: 'ringkasan', label: 'Ringkasan' },
-              { id: 'produk', label: 'Produk', badge: view.products.length },
-              { id: 'kualitas-data', label: 'Kualitas data', badge: issues ? `${issues} isu` : 'OK' },
-              { id: 'data', label: 'Data bersih', badge: formatNumber(view.rows.length) },
+              { id: 'produk', label: 'Produk' },
+              { id: 'data', label: 'Data' },
             ]}
           />
         )}
@@ -212,7 +203,7 @@ export default function App() {
         </div>
       </header>
 
-      {view && bounds && tab !== 'kualitas-data' && (
+      {view && bounds && tab !== 'data' && (
         <FilterBar
           filters={filters}
           min={bounds.min}
@@ -260,9 +251,7 @@ export default function App() {
               </>
             )}
 
-            {tab === 'kualitas-data' && <DataQuality cleaned={cleaned} file={view.file} />}
-
-            {tab === 'data' && <CleanDataTable rows={view.rows} onDownload={download} />}
+            {tab === 'data' && <DataTab cleaned={cleaned} file={view.file} onDownload={download} />}
           </div>
         )}
       </main>
