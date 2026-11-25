@@ -8,16 +8,26 @@ import type { Channel, StatusCategory } from './types';
  *   Tokopedia  "119000"
  */
 export function parseMoney(input: string | undefined): number | null {
+  return readMoney(input)?.value ?? null;
+}
+
+/**
+ * Same as parseMoney, and also names the format that was recognised
+ * (e.g. "Rp 1.234.567", "IDR 1,234,567", "1234567") for the data-quality report.
+ */
+export function readMoney(input: string | undefined): { value: number; format: string } | null {
   if (input == null) return null;
-  const s = input.trim().replace(/^(rp|idr)\.?/i, '').replace(/\s+/g, '');
+  const t = input.trim();
+  const prefix = /^rp/i.test(t) ? 'Rp ' : /^idr/i.test(t) ? 'IDR ' : '';
+  const s = t.replace(/^(rp|idr)\.?/i, '').replace(/\s+/g, '');
   if (s === '') return null;
-  if (/^\d+$/.test(s)) return Number(s);
-  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
-  if (/^\d{1,3}(,\d{3})+$/.test(s)) return Number(s.replace(/,/g, ''));
+  if (/^\d+$/.test(s)) return { value: Number(s), format: `${prefix}1234567` };
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return { value: Number(s.replace(/\./g, '')), format: `${prefix}1.234.567` };
+  if (/^\d{1,3}(,\d{3})+$/.test(s)) return { value: Number(s.replace(/,/g, '')), format: `${prefix}1,234,567` };
   // Plain decimal such as "349000.0" (rupiah has no cents, so it must be a whole number).
   if (/^\d+\.\d{1,2}$/.test(s)) {
     const n = Number(s);
-    return Number.isInteger(n) ? n : null;
+    return Number.isInteger(n) ? { value: n, format: `${prefix}1234567.0` } : null;
   }
   return null;
 }
@@ -56,7 +66,7 @@ function build(y: number, m: number, d: number, hh?: string, mm?: string): Parse
   return { day: `${y}-${pad(m)}-${pad(d)}`, time };
 }
 
-const TIME = String.raw`(?:(?:\s+|T)(\d{1,2}):(\d{2})(?::\d{2})?)?`;
+const TIME = String.raw`(?:(?:\s+|T)(\d{1,2}):(\d{2})(?::(\d{2}))?)?`;
 const ISO = new RegExp(String.raw`^(\d{4})-(\d{1,2})-(\d{1,2})${TIME}$`);
 const SLASH_DMY = new RegExp(String.raw`^(\d{1,2})/(\d{1,2})/(\d{4})${TIME}$`);
 const MON_D_Y = new RegExp(String.raw`^([a-z]{3,})\.?\s+(\d{1,2}),?\s+(\d{4})${TIME}$`, 'i');
@@ -70,17 +80,28 @@ const D_MON_Y = new RegExp(String.raw`^(\d{1,2})\s+([a-z]{3,})\.?\s+(\d{4})${TIM
  *   Tokopedia  "Oct 1, 2026"          (no time)
  */
 export function parseOrderDate(input: string | undefined): ParsedDate | null {
+  const result = readOrderDate(input);
+  return result && { day: result.day, time: result.time };
+}
+
+/**
+ * Same as parseOrderDate, and also names the format that was recognised
+ * (e.g. "DD/MM/YYYY HH:mm:ss") for the data-quality report.
+ */
+export function readOrderDate(input: string | undefined): (ParsedDate & { format: string }) | null {
   const s = (input ?? '').trim();
+  const withFormat = (date: ParsedDate | null, pattern: string, m: RegExpMatchArray) =>
+    date && { ...date, format: pattern + (m[4] ? (m[6] ? ' HH:mm:ss' : ' HH:mm') : '') };
   let m: RegExpMatchArray | null;
-  if ((m = s.match(ISO))) return build(+m[1], +m[2], +m[3], m[4], m[5]);
-  if ((m = s.match(SLASH_DMY))) return build(+m[3], +m[2], +m[1], m[4], m[5]);
+  if ((m = s.match(ISO))) return withFormat(build(+m[1], +m[2], +m[3], m[4], m[5]), 'YYYY-MM-DD', m);
+  if ((m = s.match(SLASH_DMY))) return withFormat(build(+m[3], +m[2], +m[1], m[4], m[5]), 'DD/MM/YYYY', m);
   if ((m = s.match(MON_D_Y))) {
     const month = MONTHS[m[1].slice(0, 3).toLowerCase()];
-    return month ? build(+m[3], month, +m[2], m[4], m[5]) : null;
+    return month ? withFormat(build(+m[3], month, +m[2], m[4], m[5]), 'Mon D, YYYY', m) : null;
   }
   if ((m = s.match(D_MON_Y))) {
     const month = MONTHS[m[2].slice(0, 3).toLowerCase()];
-    return month ? build(+m[3], month, +m[1], m[4], m[5]) : null;
+    return month ? withFormat(build(+m[3], month, +m[1], m[4], m[5]), 'D Mon YYYY', m) : null;
   }
   return null;
 }

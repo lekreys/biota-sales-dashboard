@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFilters, dailyRevenue, daysBetween, filterByDate, NO_FILTERS, summarize } from './metrics';
+import { applyFilters, dailyRevenue, daysBetween, filterByDate, movingAverage, NO_FILTERS, summarize } from './metrics';
 import type { CleanRow } from './types';
 
 function line(overrides: Partial<CleanRow> = {}): CleanRow {
@@ -123,6 +123,11 @@ describe('dailyRevenue', () => {
       ['2026-10-03', 70],
     ]);
     expect(days[0].byChannel).toEqual({ Shopee: 100, 'TikTok Shop': 0, Tokopedia: 50 });
+  });
+
+  it('computes a trailing moving average only once a full window exists', () => {
+    expect(movingAverage([1, 2, 3, 4, 5], 3)).toEqual([null, null, 2, 3, 4]);
+    expect(movingAverage([7, 7], 7)).toEqual([null, null]);
   });
 
   it('walks across month ends', () => {

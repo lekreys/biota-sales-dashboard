@@ -41,18 +41,20 @@ Nama produk berbeda di tiap marketplace; yang ditampilkan adalah nama listing te
 1. Buka link live di atas.
 2. Tarik file CSV ke kotak upload, atau klik **Pilih file CSV**. Bisa satu file gabungan atau beberapa file sekaligus
    (misalnya satu file per marketplace). Untuk mencoba cepat, klik **Pakai data contoh (Okt 2026)**.
-3. Jelajahi angkanya. Semua bagian dashboard mengikuti filter yang sama:
-   - **Periode:** tombol **1–15 Okt** / **16–31 Okt**, isi tanggal sendiri, atau **geser (drag) di grafik harian**
-     untuk memilih rentang. Klik satu batang untuk melihat satu hari, lalu klik lagi untuk kembali. Kedua tanggal
-     ikut dihitung.
-   - **Channel:** klik channel di kartu "Net revenue per channel" untuk melihat channel itu saja, atau
-     nyalakan/matikan channel di baris filter.
-   - **Produk:** klik produk di Top 10 atau di tabel produk untuk melihat penjualan produk itu saja. Tabel produk
-     bisa dicari dan diurutkan.
-   - Arahkan kursor ke grafik untuk melihat rincian per channel. Setiap grafik juga punya versi tabel.
-   - Tombol ☾ / ☀ di kanan atas mengganti mode gelap / terang.
-4. Di bagian bawah, **Dari file ke angka** menunjukkan apa saja yang dibersihkan dan dikecualikan, supaya angkanya
-   bisa dicek ulang. Tombol **Unduh data bersih** menyimpan data yang sudah dibersihkan sesuai filter sebagai CSV.
+3. Dashboard punya empat tab. Di laptop/desktop setiap tab muat dalam satu layar:
+   - **Ringkasan:** net revenue, jumlah pesanan, unit, rata-rata per pesanan, grafik net revenue harian per channel
+     (dengan garis rata-rata 7 hari), dan net revenue per channel.
+   - **Produk:** 10 produk teratas (dengan porsi tiap channel) dan tabel semua produk yang bisa dicari dan diurutkan.
+   - **Kualitas data:** perjalanan data dari file ke angka (495 baris dibaca → 473 bersih → 393 dihitung), contoh
+     setiap format yang disatukan, dan cara setiap status diperlakukan.
+   - **Data bersih:** semua baris setelah dibersihkan, bisa dicari, difilter per status, dan diunduh sebagai CSV.
+4. Filter di bawah tab berlaku untuk semua tab:
+   - **Periode:** tombol **1–15 Okt** / **16–31 Okt**, isi tanggal sendiri, atau **geser (drag) di grafik harian**.
+     Klik satu batang untuk melihat satu hari, lalu klik lagi untuk kembali. Kedua tanggal ikut dihitung.
+   - **Channel:** klik channel di panel channel untuk melihat channel itu saja, atau nyalakan/matikan di baris filter.
+   - **Produk:** klik produk di tab Produk untuk melihat penjualan produk itu saja.
+5. Arahkan kursor ke grafik untuk melihat rincian per channel. Grafik harian juga bisa ditampilkan sebagai tabel.
+   Tombol di kanan atas mengganti mode gelap/terang. File CSV juga bisa ditarik ke mana saja di jendela.
 
 Semua proses terjadi di browser. File tidak dikirim ke server mana pun.
 
@@ -138,10 +140,16 @@ bisa di-import ke Vercel atau Netlify tanpa perubahan (build `npm run build`, ou
    "Dikomplain - Retur" dihitung), dan setiap kali test langsung gagal.
 5. **Cek di browser:** angka yang tampil di layar dicocokkan dengan test untuk "Semua", "1–15" dan "16–31", termasuk
    upload file yang sama dua kali, file berkolom salah, file .xlsx, dan tampilan di lebar HP.
-6. **Fitur interaktif memakai hitungan yang sama.** Grafik harian, filter channel dan filter produk dihitung oleh
-   fungsi yang sama dengan tabel. Test memastikan total harian = total bulan (Rp 298.937.000), Shopee saja =
-   Rp 180.315.000, dan satu produk = angka di tabel produk. Angka per hari di tooltip juga dicocokkan dengan skrip
-   Python (misalnya 10 Okt: Rp 6.650.000).
+6. **Setiap angka di dashboard dicocokkan dengan hitungan Python.** `src/lib/crosscheck.test.ts` menjalankan skrip
+   Python untuk 8 skenario filter (semua data, 1–15 Okt, 16–31 Okt, satu hari, Shopee saja, dua channel + rentang
+   tanggal, satu produk, satu produk di satu channel + rentang tanggal). Untuk setiap skenario, semua angka harus sama
+   persis: net revenue, pesanan, unit, rata-rata per pesanan, nilai yang tidak dihitung, tiap channel, tiap produk
+   (beserta porsi per channel), dan setiap hari di grafik harian. Test ini ikut berjalan sebelum setiap deploy.
+   Empat rumus sengaja dirusak (tanggal akhir eksklusif, unit dari semua status, pembulatan rata-rata ke bawah, retur
+   ikut dihitung di grafik), dan setiap kali test langsung gagal.
+7. **Angka di layar ikut dicek.** Robot browser mengatur ke-8 skenario lewat filter di layar, lalu membaca angka
+   yang benar-benar tampil (kartu, panel channel, tabel produk, Top 10, tabel harian). Hasilnya 318 angka, semua sama
+   dengan hitungan Python.
 
 ## Tiga hal yang salah dikerjakan AI
 
@@ -184,8 +192,9 @@ src/lib/parse.ts      Membaca harga, tanggal, channel dan status
 src/lib/clean.ts      Menggabungkan file, memulihkan SKU, membuang duplikat
 src/lib/metrics.ts    Filter (tanggal, channel, produk), hitungan net revenue, data harian
 src/lib/csv.ts        Membaca CSV dan membuat CSV data bersih
-src/components/       Tampilan dashboard (filter, angka utama, grafik, tabel, rekonsiliasi)
-src/hooks/            Animasi angka
+src/lib/*.test.ts     Test: aturan pembersihan, angka akhir, dan cek silang dengan Python
+src/components/       Tampilan dashboard (tab, filter, angka utama, grafik, tabel, kualitas data)
+src/hooks/            Animasi angka saat filter berubah
 scripts/verify_numbers.py   Hitungan kedua (Python) untuk cek silang
 data/                 File ekspor Oktober 2026
 ```

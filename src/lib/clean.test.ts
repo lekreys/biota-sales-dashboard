@@ -91,6 +91,31 @@ describe('cleanRows', () => {
     expect(result.productNames['BIO-CAM-BF']).toBe('Kamera BF BIOTA');
   });
 
+  it('reports the raw formats and channel spellings it found, and the value of removed duplicates', () => {
+    const result = cleanRows([
+      {
+        name: 'a.csv',
+        rows: [
+          row(),
+          row(),
+          row({ order_id: 'TTS1', channel: 'TIKTOK SHOP', order_date: '21/10/2026 08:24:00', unit_price: '1,099,000', total_price: 'IDR 1,099,000' }),
+        ],
+      },
+    ]);
+    expect(result.duplicateValue).toBe(1099000);
+    expect(result.formats.map((f) => [f.field, f.format, f.count, f.channels])).toEqual([
+      ['date', 'YYYY-MM-DD HH:mm', 2, ['Shopee']],
+      ['date', 'DD/MM/YYYY HH:mm:ss', 1, ['TikTok Shop']],
+      ['money', 'Rp 1.234.567', 4, ['Shopee']],
+      ['money', '1,234,567', 1, ['TikTok Shop']],
+      ['money', 'IDR 1,234,567', 1, ['TikTok Shop']],
+    ]);
+    expect(result.channelSpellings).toEqual([
+      { raw: 'Shopee', channel: 'Shopee', count: 2 },
+      { raw: 'TIKTOK SHOP', channel: 'TikTok Shop', count: 1 },
+    ]);
+  });
+
   it('counts lines where qty x unit_price does not match total_price', () => {
     const result = cleanRows([{ name: 'a.csv', rows: [row({ qty: '2' })] }]);
     expect(result.priceMismatches).toBe(1);

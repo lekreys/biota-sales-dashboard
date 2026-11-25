@@ -39,12 +39,12 @@ export function ProductTable({ products, selected, onSelect }: Props) {
   };
 
   return (
-    <section className="card rise">
+    <section className="card fill-card">
       <div className="card-head">
         <div>
           <h2>Net revenue per produk</h2>
           <p className="secondary small">
-            {products.length} produk. Klik judul kolom untuk mengurutkan, klik nama untuk memfilter.
+            {products.length} produk · klik judul kolom untuk mengurutkan
           </p>
         </div>
         <input
@@ -56,7 +56,7 @@ export function ProductTable({ products, selected, onSelect }: Props) {
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <div className="table-wrap">
+      <div className="scroll-area">
         <table>
           <thead>
             <tr>

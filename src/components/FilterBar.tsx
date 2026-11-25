@@ -3,6 +3,7 @@ import type { Filters } from '../lib/metrics';
 import { CHANNELS } from '../lib/types';
 import type { Channel } from '../lib/types';
 import { Swatch } from './channelColor';
+import { CloseIcon } from './Icons';
 
 interface Props {
   filters: Filters;
@@ -31,7 +32,7 @@ export function FilterBar({ filters, min, max, invalid, productName, onChange, o
   }
 
   return (
-    <div className="filterbar" role="group" aria-label="Filter">
+    <div className="filter-row" role="group" aria-label="Filter">
       <div className="filter-group">
         <span className="filter-label">Periode</span>
         <div className="segmented">
@@ -88,7 +89,7 @@ export function FilterBar({ filters, min, max, invalid, productName, onChange, o
           <span className="chip-toggle on product-chip">
             <span className="truncate">{productName}</span>
             <button className="chip-x" aria-label="Hapus filter produk" onClick={() => onChange({ product: null })}>
-              ×
+              <CloseIcon />
             </button>
           </span>
         </div>

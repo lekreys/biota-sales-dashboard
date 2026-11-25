@@ -6,13 +6,19 @@ This is a second implementation of the same rules, written in plain Python
 If the dashboard and this script agree, the numbers are very unlikely to be
 wrong because of a parsing bug in one of them.
 
-Usage: python3 scripts/verify_numbers.py data/biota_orders_oct2026.csv
+Usage:
+  python3 scripts/verify_numbers.py data/biota_orders_oct2026.csv          # readable report
+  python3 scripts/verify_numbers.py --json data/biota_orders_oct2026.csv   # every dashboard number, as JSON
+
+The JSON mode is used by src/lib/crosscheck.test.ts: for each filter scenario below,
+every number the dashboard shows must equal the number computed here.
 """
 import csv
+import json
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 CHANNELS = {"shopee": "Shopee", "tiktokshop": "TikTok Shop", "tiktok": "TikTok Shop",
             "tokopedia": "Tokopedia", "tokped": "Tokopedia"}
@@ -59,6 +65,7 @@ def load(path):
             "unit": money(r["unit_price"]),
             "total": money(r["total_price"]),
             "status": r["status"].strip().lower(),
+            "status_raw": " ".join(r["status"].split()),
             "city": r["buyer_city"].strip(),
         })
     # Fill empty SKUs from rows with the same channel + listing name.
@@ -113,5 +120,106 @@ def main(path):
         print(f"{i:>2}. {sku:<12} Rp {total:>12,}  {qty:>3} unit")
 
 
+ALL_CHANNELS = ["Shopee", "TikTok Shop", "Tokopedia"]
+
+# Filter scenarios checked against the dashboard (the TypeScript test reads them from here).
+SCENARIOS = [
+    {"name": "semua data", "from": "", "to": "", "channels": ALL_CHANNELS, "product": None},
+    {"name": "1-15 Oktober", "from": "2026-10-01", "to": "2026-10-15", "channels": ALL_CHANNELS, "product": None},
+    {"name": "16-31 Oktober", "from": "2026-10-16", "to": "2026-10-31", "channels": ALL_CHANNELS, "product": None},
+    {"name": "satu hari, 5 Oktober", "from": "2026-10-05", "to": "2026-10-05", "channels": ALL_CHANNELS, "product": None},
+    {"name": "Shopee saja", "from": "", "to": "", "channels": ["Shopee"], "product": None},
+    {"name": "TikTok Shop + Tokopedia, 1-15 Oktober", "from": "2026-10-01", "to": "2026-10-15",
+     "channels": ["TikTok Shop", "Tokopedia"], "product": None},
+    {"name": "produk BIO-CAM-BF", "from": "", "to": "", "channels": ALL_CHANNELS, "product": "BIO-CAM-BF"},
+    {"name": "produk BIO-SD-S64 di Tokopedia, 16-31 Oktober", "from": "2026-10-16", "to": "2026-10-31",
+     "channels": ["Tokopedia"], "product": "BIO-SD-S64"},
+]
+
+
+def keep(r, f, ignore=()):
+    if "date" not in ignore and ((f["from"] and r["day"] < f["from"]) or (f["to"] and r["day"] > f["to"])):
+        return False
+    if "channel" not in ignore and r["channel"] not in f["channels"]:
+        return False
+    if "product" not in ignore and f["product"] and r["sku"] != f["product"]:
+        return False
+    return True
+
+
+def scenario(rows, f, first_day, last_day):
+    selected = [r for r in rows if keep(r, f)]
+    counted = [r for r in selected if r["status"] in COUNTED]
+    excluded = [r for r in selected if r["status"] not in COUNTED]
+    net = sum(r["total"] for r in counted)
+    orders = len({(r["channel"], r["order_id"]) for r in counted})
+    # Same rounding as JavaScript Math.round for positive numbers (round half up).
+    average = (2 * net + orders) // (2 * orders) if orders else 0
+
+    # Channel panel ignores the channel filter, product panel ignores the product filter,
+    # daily chart ignores the date filter (they highlight the selection instead).
+    by_channel_rows = [r for r in rows if keep(r, f, ("channel",)) and r["status"] in COUNTED]
+    channels = {}
+    for ch in ALL_CHANNELS:
+        lines = [r for r in by_channel_rows if r["channel"] == ch]
+        channels[ch] = {"net": sum(r["total"] for r in lines),
+                        "orders": len({r["order_id"] for r in lines}),
+                        "units": sum(r["qty"] for r in lines)}
+
+    products = {}
+    for r in rows:
+        if keep(r, f, ("product",)) and r["status"] in COUNTED:
+            p = products.setdefault(r["sku"], {"net": 0, "units": 0, "by_channel": {c: 0 for c in ALL_CHANNELS}})
+            p["net"] += r["total"]
+            p["units"] += r["qty"]
+            p["by_channel"][r["channel"]] += r["total"]
+
+    daily = {}
+    d, end = date.fromisoformat(first_day), date.fromisoformat(last_day)
+    while d <= end:
+        daily[d.isoformat()] = {c: 0 for c in ALL_CHANNELS}
+        d += timedelta(days=1)
+    for r in rows:
+        if keep(r, f, ("date",)) and r["status"] in COUNTED:
+            daily[r["day"]][r["channel"]] += r["total"]
+
+    return {
+        "name": f["name"],
+        "filter": {k: f[k] for k in ("from", "to", "channels", "product")},
+        "totals": {"net": net, "orders": orders, "units": sum(r["qty"] for r in counted), "average": average,
+                   "excluded_value": sum(r["total"] for r in excluded), "excluded_lines": len(excluded)},
+        "channels": channels,
+        "products": products,
+        "daily": daily,
+    }
+
+
+def as_json(path):
+    raw, rows = load(path)
+    days = sorted(r["day"] for r in rows)
+    statuses = {}
+    for r in rows:
+        s = statuses.setdefault(r["status_raw"], {"lines": 0, "value": 0})
+        s["lines"] += 1
+        s["value"] += r["total"]
+    counted_dups = len(raw) - len(rows)
+    return {
+        "file": {
+            "rows_read": len(raw),
+            "duplicates": counted_dups,
+            "clean_lines": len(rows),
+            "sku_missing": sum(1 for r in rows if r["sku_was_empty"]),
+            "sku_recovered": sum(1 for r in rows if r["sku_was_empty"] and r["sku"]),
+            "statuses": statuses,
+        },
+        "scenarios": [scenario(rows, f, days[0], days[-1]) for f in SCENARIOS],
+    }
+
+
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "data/biota_orders_oct2026.csv")
+    args = [a for a in sys.argv[1:] if a != "--json"]
+    csv_path = args[0] if args else "data/biota_orders_oct2026.csv"
+    if "--json" in sys.argv:
+        print(json.dumps(as_json(csv_path), ensure_ascii=False))
+    else:
+        main(csv_path)

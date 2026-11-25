@@ -33,6 +33,26 @@ describe('October 2026 export', () => {
     expect(result.rows.filter((r) => r.status === 'unknown')).toEqual([]);
   });
 
+  it('finds one date format per marketplace, the price formats, and 10 channel spellings', () => {
+    const dates = result.formats.filter((f) => f.field === 'date').map((f) => [f.format, f.count, f.channels]);
+    expect(dates).toEqual([
+      ['YYYY-MM-DD HH:mm', 307, ['Shopee']],
+      ['DD/MM/YYYY HH:mm:ss', 107, ['TikTok Shop']],
+      ['Mon D, YYYY', 81, ['Tokopedia']],
+    ]);
+    // unit_price + total_price: Shopee 2 x 307, TikTok 2 x 107 (15 with "IDR"), Tokopedia 2 x 81
+    const money = result.formats.filter((f) => f.field === 'money').map((f) => [f.format, f.count, f.channels]);
+    expect(money).toEqual([
+      ['Rp 1.234.567', 614, ['Shopee']],
+      ['1,234,567', 199, ['TikTok Shop']],
+      ['1234567', 162, ['Tokopedia']],
+      ['IDR 1,234,567', 15, ['TikTok Shop']],
+    ]);
+    expect(result.channelSpellings).toHaveLength(10);
+    // Independently computed in Python: removed duplicates would have added Rp 16.568.000.
+    expect(result.duplicateValue).toBe(16_568_000);
+  });
+
   it('net revenue for the whole month', () => {
     const s = summarize(result.rows, result.productNames);
     expect(s.netRevenue).toBe(298_937_000);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyStatus, normalizeChannel, parseMoney, parseOrderDate, parseQty } from './parse';
+import { classifyStatus, normalizeChannel, parseMoney, parseOrderDate, parseQty, readMoney, readOrderDate } from './parse';
 
 describe('parseMoney', () => {
   it.each([
@@ -53,6 +53,30 @@ describe('parseOrderDate', () => {
       expect(parseOrderDate(input)).toBeNull();
     },
   );
+});
+
+describe('format names for the data-quality report', () => {
+  it.each([
+    ['Rp1.099.000', 'Rp 1.234.567'],
+    ['Rp 699.000', 'Rp 1.234.567'],
+    ['IDR 1,099,000', 'IDR 1,234,567'],
+    ['349,000', '1,234,567'],
+    ['119000', '1234567'],
+    ['349000.0', '1234567.0'],
+  ])('money %s is %s', (input, format) => {
+    expect(readMoney(input)?.format).toBe(format);
+  });
+
+  it.each([
+    ['2026-10-21 08:24', 'YYYY-MM-DD HH:mm'],
+    ['21/10/2026 08:24:00', 'DD/MM/YYYY HH:mm:ss'],
+    ['3/10/2026 08:24:00', 'DD/MM/YYYY HH:mm:ss'],
+    ['Oct 1, 2026', 'Mon D, YYYY'],
+    ['Oct 01, 2026', 'Mon D, YYYY'],
+    ['1 Okt 2026', 'D Mon YYYY'],
+  ])('date %s is %s', (input, format) => {
+    expect(readOrderDate(input)?.format).toBe(format);
+  });
 });
 
 describe('normalizeChannel', () => {

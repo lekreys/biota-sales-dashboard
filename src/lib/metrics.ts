@@ -66,6 +66,9 @@ export interface Summary {
   netRevenue: number;
   orders: number;
   units: number;
+  averageOrderValue: number; // net revenue / orders, rounded to whole rupiah
+  excludedValue: number; // total_price of cancelled, returned and unknown-status lines
+  excludedLines: number;
   byChannel: ChannelSummary[];
   byProduct: ProductSummary[];
   excluded: Record<Exclude<StatusCategory, 'counted'>, { lines: number; value: number }>;
@@ -123,10 +126,15 @@ export function summarize(rows: CleanRow[], productNames: Record<string, string>
     statuses.set(r.statusRaw, s);
   }
 
+  const netRevenue = sum(counted.map((r) => r.totalPrice));
+  const orders = new Set(counted.map(orderKey)).size;
   return {
-    netRevenue: sum(counted.map((r) => r.totalPrice)),
-    orders: new Set(counted.map(orderKey)).size,
+    netRevenue,
+    orders,
     units: sum(counted.map((r) => r.qty)),
+    averageOrderValue: orders ? Math.round(netRevenue / orders) : 0,
+    excludedValue: excluded.cancelled.value + excluded.returned.value + excluded.unknown.value,
+    excludedLines: excluded.cancelled.lines + excluded.returned.lines + excluded.unknown.lines,
     byChannel,
     byProduct,
     excluded,
@@ -163,6 +171,11 @@ export function dailyRevenue(rows: CleanRow[], first: string, last: string): Day
     points[i].total += r.totalPrice;
   }
   return points;
+}
+
+/** Trailing average over `window` days; null until a full window of days is available. */
+export function movingAverage(values: number[], window = 7): (number | null)[] {
+  return values.map((_, i) => (i + 1 < window ? null : sum(values.slice(i + 1 - window, i + 1)) / window));
 }
 
 function sum(values: number[]): number {

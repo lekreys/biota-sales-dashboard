@@ -4,12 +4,13 @@ const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /**
- * Counts smoothly from the previous value to `target`. Interruptible: a new target
- * continues from whatever is on screen. Always lands exactly on `target`.
+ * Counts smoothly from the previous value to `target` when the target changes (e.g. a filter).
+ * On first render it shows `target` immediately, so opening a tab never shows an in-between
+ * number. Interruptible: a new target continues from whatever is on screen. Always lands exactly on `target`.
  */
-export function useAnimatedNumber(target: number, duration = 500): number {
-  const [value, setValue] = useState(0);
-  const shown = useRef(0);
+export function useAnimatedNumber(target: number, duration = 400): number {
+  const [value, setValue] = useState(target);
+  const shown = useRef(target);
 
   useEffect(() => {
     const start = shown.current;

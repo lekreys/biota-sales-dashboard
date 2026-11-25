@@ -1,5 +1,5 @@
-import { classifyStatus, normalizeChannel, parseMoney, parseOrderDate, parseQty } from './parse';
-import type { CleanResult, CleanRow, RejectedRow, SourceFile } from './types';
+import { classifyStatus, normalizeChannel, parseQty, readMoney, readOrderDate } from './parse';
+import type { Channel, CleanResult, CleanRow, FormatStat, RejectedRow, SourceFile } from './types';
 
 const clean = (s: string | undefined) => (s ?? '').trim().replace(/\s+/g, ' ');
 
@@ -8,11 +8,18 @@ export function productKey(row: Pick<CleanRow, 'sku' | 'productName'>): string {
   return row.sku || `TANPA SKU: ${row.productName}`;
 }
 
-function parseRow(raw: Record<string, string>): CleanRow | string {
+/** A parsed row plus the raw formats it was written in (for the data-quality report). */
+interface ParsedRow {
+  row: CleanRow;
+  seen: { field: FormatStat['field']; format: string; example: string }[];
+  rawChannel: string;
+}
+
+function parseRow(raw: Record<string, string>): ParsedRow | string {
   const orderId = clean(raw.order_id);
   if (!orderId) return 'order_id kosong';
 
-  const date = parseOrderDate(raw.order_date);
+  const date = readOrderDate(raw.order_date);
   if (!date) return `tanggal tidak dikenali: "${clean(raw.order_date)}"`;
 
   const channel = normalizeChannel(raw.channel);
@@ -21,27 +28,35 @@ function parseRow(raw: Record<string, string>): CleanRow | string {
   const qty = parseQty(raw.qty);
   if (qty === null) return `qty tidak valid: "${clean(raw.qty)}"`;
 
-  const unitPrice = parseMoney(raw.unit_price);
-  if (unitPrice === null) return `unit_price tidak valid: "${clean(raw.unit_price)}"`;
+  const unit = readMoney(raw.unit_price);
+  if (unit === null) return `unit_price tidak valid: "${clean(raw.unit_price)}"`;
 
-  const totalPrice = parseMoney(raw.total_price);
-  if (totalPrice === null) return `total_price tidak valid: "${clean(raw.total_price)}"`;
+  const total = readMoney(raw.total_price);
+  if (total === null) return `total_price tidak valid: "${clean(raw.total_price)}"`;
 
   const statusRaw = clean(raw.status);
   return {
-    orderId,
-    day: date.day,
-    time: date.time,
-    channel,
-    sku: clean(raw.sku).toUpperCase(),
-    skuRecovered: false,
-    productName: clean(raw.product_name),
-    qty,
-    unitPrice,
-    totalPrice,
-    statusRaw,
-    status: classifyStatus(statusRaw),
-    buyerCity: clean(raw.buyer_city),
+    row: {
+      orderId,
+      day: date.day,
+      time: date.time,
+      channel,
+      sku: clean(raw.sku).toUpperCase(),
+      skuRecovered: false,
+      productName: clean(raw.product_name),
+      qty,
+      unitPrice: unit.value,
+      totalPrice: total.value,
+      statusRaw,
+      status: classifyStatus(statusRaw),
+      buyerCity: clean(raw.buyer_city),
+    },
+    seen: [
+      { field: 'date', format: date.format, example: clean(raw.order_date) },
+      { field: 'money', format: unit.format, example: clean(raw.unit_price) },
+      { field: 'money', format: total.format, example: clean(raw.total_price) },
+    ],
+    rawChannel: clean(raw.channel),
   };
 }
 
@@ -54,14 +69,30 @@ function parseRow(raw: Record<string, string>): CleanRow | string {
 export function cleanRows(files: SourceFile[]): CleanResult {
   const parsed: CleanRow[] = [];
   const rejected: RejectedRow[] = [];
+  const formats = new Map<string, FormatStat>();
+  const spellings = new Map<string, { raw: string; channel: Channel; count: number }>();
   let rowsRead = 0;
 
   for (const file of files) {
     file.rows.forEach((raw, i) => {
       rowsRead++;
       const result = parseRow(raw);
-      if (typeof result === 'string') rejected.push({ file: file.name, line: i + 2, reason: result });
-      else parsed.push(result);
+      if (typeof result === 'string') {
+        rejected.push({ file: file.name, line: i + 2, reason: result });
+        return;
+      }
+      const { row } = result;
+      parsed.push(row);
+      for (const s of result.seen) {
+        const key = `${s.field}|${s.format}`;
+        const stat = formats.get(key) ?? { field: s.field, format: s.format, example: s.example, count: 0, channels: [] };
+        stat.count++;
+        if (!stat.channels.includes(row.channel)) stat.channels.push(row.channel);
+        formats.set(key, stat);
+      }
+      const spelling = spellings.get(result.rawChannel) ?? { raw: result.rawChannel, channel: row.channel, count: 0 };
+      spelling.count++;
+      spellings.set(result.rawChannel, spelling);
     });
   }
 
@@ -92,12 +123,16 @@ export function cleanRows(files: SourceFile[]): CleanResult {
 
   const seen = new Set<string>();
   const rows: CleanRow[] = [];
+  let duplicateValue = 0;
   for (const r of parsed) {
     const key = [
       r.orderId, r.channel, r.day, r.time, r.sku, r.productName,
       r.qty, r.unitPrice, r.totalPrice, r.statusRaw.toLowerCase(), r.buyerCity,
     ].join('|');
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      if (r.status === 'counted') duplicateValue += r.totalPrice;
+      continue;
+    }
     seen.add(key);
     rows.push(r);
   }
@@ -125,6 +160,9 @@ export function cleanRows(files: SourceFile[]): CleanResult {
     skuMissing: rows.filter((r) => r.skuRecovered || !r.sku).length,
     skuRecovered: rows.filter((r) => r.skuRecovered).length,
     priceMismatches: rows.filter((r) => r.qty * r.unitPrice !== r.totalPrice).length,
+    duplicateValue,
     productNames,
+    formats: [...formats.values()].sort((a, b) => a.field.localeCompare(b.field) || b.count - a.count),
+    channelSpellings: [...spellings.values()].sort((a, b) => a.channel.localeCompare(b.channel) || b.count - a.count),
   };
 }

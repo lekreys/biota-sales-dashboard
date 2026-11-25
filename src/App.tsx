@@ -1,21 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChannelSection } from './components/ChannelSection';
+import type { DragEvent } from 'react';
+import { ChannelCards } from './components/ChannelCards';
+import { CleanDataTable } from './components/CleanDataTable';
+import { DataQuality } from './components/DataQuality';
 import { FilterBar } from './components/FilterBar';
+import { CloseIcon, LogoMark, MoonIcon, SunIcon } from './components/Icons';
 import { KpiRow } from './components/KpiRow';
 import { ProductTable } from './components/ProductTable';
-import { Reconciliation } from './components/Reconciliation';
+import { Tabs } from './components/Tabs';
 import { TopProducts } from './components/TopProducts';
 import { TrendChart } from './components/TrendChart';
-import { UploadArea } from './components/UploadArea';
+import { EmptyState, FileActions } from './components/UploadArea';
 import { cleanRows } from './lib/clean';
 import { readCsv, toCsv } from './lib/csv';
-import { formatDay } from './lib/format';
+import { formatDay, formatNumber } from './lib/format';
 import { applyFilters, dailyRevenue, NO_FILTERS, summarize } from './lib/metrics';
 import type { Filters } from './lib/metrics';
 import { CHANNELS } from './lib/types';
 import type { Channel, SourceFile } from './lib/types';
 
 type Theme = 'light' | 'dark' | null; // null = follow the operating system
+
+const TAB_IDS = ['ringkasan', 'produk', 'kualitas-data', 'data'] as const;
+type TabId = (typeof TAB_IDS)[number];
 
 function storedTheme(): Theme {
   try {
@@ -26,11 +33,21 @@ function storedTheme(): Theme {
   }
 }
 
+/** The open tab lives in the URL (#produk), so a refresh or a shared link opens the same tab. */
+function tabFromHash(): TabId {
+  const id = window.location.hash.slice(1);
+  return (TAB_IDS as readonly string[]).includes(id) ? (id as TabId) : 'ringkasan';
+}
+
+const hasFiles = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
+
 export default function App() {
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [theme, setTheme] = useState<Theme>(storedTheme);
+  const [tab, setTab] = useState<TabId>(tabFromHash);
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -44,6 +61,10 @@ export default function App() {
     }
   }, [theme]);
   const isDark = theme === 'dark' || (theme === null && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+
+  useEffect(() => {
+    if (files.length) history.replaceState(null, '', `#${tab}`);
+  }, [tab, files.length]);
 
   const cleaned = useMemo(() => (files.length ? cleanRows(files) : null), [files]);
   const bounds = useMemo(() => {
@@ -59,10 +80,13 @@ export default function App() {
     const rows = invalidRange ? [] : cleaned.rows;
     const names = cleaned.productNames;
     const filtered = applyFilters(rows, filters);
+    const withAllChannels = applyFilters(rows, filters, { channel: true });
     return {
       rows: filtered,
       summary: summarize(filtered, names),
-      channels: summarize(applyFilters(rows, filters, { channel: true }), names).byChannel,
+      file: summarize(cleaned.rows, names),
+      channels: summarize(withAllChannels, names).byChannel,
+      channelDaily: dailyRevenue(withAllChannels, filters.from || bounds.min, filters.to || bounds.max),
       products: summarize(applyFilters(rows, filters, { product: true }), names).byProduct,
       daily: dailyRevenue(applyFilters(cleaned.rows, filters, { date: true }), bounds.min, bounds.max),
     };
@@ -97,6 +121,8 @@ export default function App() {
     setFiles([]);
     setErrors([]);
     setFilters(NO_FILTERS);
+    setTab('ringkasan');
+    history.replaceState(null, '', window.location.pathname);
   }
 
   const update = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
@@ -124,78 +150,141 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  const issues = cleaned
+    ? cleaned.rejected.length +
+      cleaned.priceMismatches +
+      (cleaned.skuMissing - cleaned.skuRecovered) +
+      cleaned.rows.filter((r) => r.status === 'unknown').length
+    : 0;
+
   return (
-    <div className="page">
-      <header className="header">
-        <div>
-          <p className="eyebrow">BIOTA Smart Home</p>
-          <h1>Dashboard Penjualan</h1>
-          <p className="secondary">
-            Shopee, TikTok Shop dan Tokopedia
-            {bounds && ` · ${formatDay(bounds.min)} – ${formatDay(bounds.max)}`}
-          </p>
+    <div
+      className="shell"
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        setDragging(false);
+        addFiles([...e.dataTransfer.files]);
+      }}
+    >
+      <header className="topbar">
+        <div className="brand">
+          <LogoMark />
+          <div>
+            <p className="brand-name">Dashboard Penjualan</p>
+            <p className="brand-sub">
+              BIOTA Smart Home{bounds && ` · ${formatDay(bounds.min)} – ${formatDay(bounds.max)}`}
+            </p>
+          </div>
         </div>
-        <button
-          className="icon-button"
-          onClick={() => setTheme(isDark ? 'light' : 'dark')}
-          aria-label={isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
-          title={isDark ? 'Mode terang' : 'Mode gelap'}
-        >
-          {isDark ? '☀' : '☾'}
-        </button>
+
+        {view && (
+          <Tabs
+            active={tab}
+            onChange={setTab}
+            tabs={[
+              { id: 'ringkasan', label: 'Ringkasan' },
+              { id: 'produk', label: 'Produk', badge: view.products.length },
+              { id: 'kualitas-data', label: 'Kualitas data', badge: issues ? `${issues} isu` : 'OK' },
+              { id: 'data', label: 'Data bersih', badge: formatNumber(view.rows.length) },
+            ]}
+          />
+        )}
+
+        <div className="topbar-actions">
+          {files.length > 0 && <FileActions files={files} onFiles={addFiles} onReset={reset} />}
+          <button
+            className="icon-button"
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            aria-label={isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
+            title={isDark ? 'Mode terang' : 'Mode gelap'}
+          >
+            {isDark ? <SunIcon /> : <MoonIcon />}
+          </button>
+        </div>
       </header>
 
-      <UploadArea files={files} errors={errors} onFiles={addFiles} onSample={loadSample} onReset={reset} />
-
-      {cleaned && bounds && view && (
-        <>
-          <FilterBar
-            filters={filters}
-            min={bounds.min}
-            max={bounds.max}
-            invalid={invalidRange}
-            productName={productName}
-            onChange={update}
-            onReset={() => setFilters(NO_FILTERS)}
-          />
-
-          <KpiRow
-            summary={view.summary}
-            periodLabel={periodLabel}
-            scopeLabel={scopeLabel}
-            onDownload={download}
-            canDownload={view.rows.length > 0}
-          />
-
-          <TrendChart
-            points={view.daily}
-            from={filters.from}
-            to={filters.to}
-            channels={filters.channels}
-            onSelect={(from, to) => update({ from, to })}
-          />
-
-          <div className="grid">
-            <ChannelSection channels={view.channels} selected={filters.channels} onSolo={soloChannel} />
-            <TopProducts
-              products={view.products}
-              channels={filters.channels}
-              selected={filters.product}
-              onSelect={toggleProduct}
-            />
-          </div>
-
-          <ProductTable products={view.products} selected={filters.product} onSelect={toggleProduct} />
-
-          <Reconciliation cleaned={cleaned} summary={view.summary} />
-        </>
+      {view && bounds && tab !== 'kualitas-data' && (
+        <FilterBar
+          filters={filters}
+          min={bounds.min}
+          max={bounds.max}
+          invalid={invalidRange}
+          productName={productName}
+          onChange={update}
+          onReset={() => setFilters(NO_FILTERS)}
+        />
       )}
 
-      <footer className="footer secondary">
-        Net revenue = total harga dari pesanan yang tidak dibatalkan dan tidak diretur/refund. Pesanan yang sudah selesai
-        maupun yang masih dalam pengiriman tetap dihitung. Semua data diproses di browser kamu dan tidak dikirim ke
-        server.
-      </footer>
+      <main className="main">
+        {!view || !cleaned ? (
+          <EmptyState onFiles={addFiles} onSample={loadSample} />
+        ) : (
+          <div className={`panel panel-${tab}`} role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} key={tab}>
+            {tab === 'ringkasan' && (
+              <>
+                <KpiRow summary={view.summary} periodLabel={periodLabel} scopeLabel={scopeLabel} />
+                <TrendChart
+                  points={view.daily}
+                  from={filters.from}
+                  to={filters.to}
+                  channels={filters.channels}
+                  onSelect={(from, to) => update({ from, to })}
+                />
+                <ChannelCards
+                  channels={view.channels}
+                  daily={view.channelDaily}
+                  selected={filters.channels}
+                  onSolo={soloChannel}
+                />
+              </>
+            )}
+
+            {tab === 'produk' && (
+              <>
+                <TopProducts
+                  products={view.products}
+                  channels={filters.channels}
+                  selected={filters.product}
+                  onSelect={toggleProduct}
+                />
+                <ProductTable products={view.products} selected={filters.product} onSelect={toggleProduct} />
+              </>
+            )}
+
+            {tab === 'kualitas-data' && <DataQuality cleaned={cleaned} file={view.file} />}
+
+            {tab === 'data' && <CleanDataTable rows={view.rows} onDownload={download} />}
+          </div>
+        )}
+      </main>
+
+      {errors.length > 0 && (
+        <div className="toast" role="alert">
+          <ul>
+            {errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+          <button className="icon-button" aria-label="Tutup pesan" onClick={() => setErrors([])}>
+            <CloseIcon />
+          </button>
+        </div>
+      )}
+
+      {dragging && (
+        <div className="drop-overlay" aria-hidden>
+          <span>Lepaskan untuk menambahkan file CSV</span>
+        </div>
+      )}
     </div>
   );
 }

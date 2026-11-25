@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { formatCompact, formatDay, formatDayLong, formatRupiah, monthName } from '../lib/format';
+import { movingAverage } from '../lib/metrics';
 import type { DayPoint } from '../lib/metrics';
 import { CHANNELS } from '../lib/types';
 import type { Channel } from '../lib/types';
@@ -25,6 +27,7 @@ interface Props {
 
 export function TrendChart({ points, from, to, channels, onSelect }: Props) {
   const plot = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<'chart' | 'table'>('chart');
   const [hover, setHover] = useState<number | null>(null);
   const [drag, setDrag] = useState<{ start: number; end: number } | null>(null);
 
@@ -34,6 +37,12 @@ export function TrendChart({ points, from, to, channels, onSelect }: Props) {
   const inRange = (day: string) => (!from || day >= from) && (!to || day <= to);
   const hasRange = Boolean(from || to);
   const shown = CHANNELS.filter((c) => channels.includes(c));
+  const average = movingAverage(points.map((p) => p.total), 7);
+  const averageLine = average
+    .map((v, i) => (v === null ? null : `${i + 0.5},${100 - (v / top) * 100}`))
+    .filter(Boolean)
+    .join(' ');
+  const peak = points.reduce((best, p, i) => (p.total > points[best].total ? i : best), 0);
 
   const indexAt = (clientX: number) => {
     const rect = plot.current!.getBoundingClientRect();
@@ -62,116 +71,149 @@ export function TrendChart({ points, from, to, channels, onSelect }: Props) {
   const align = hover === null ? '' : hover < n * 0.25 ? 'start' : hover > n * 0.75 ? 'end' : '';
 
   return (
-    <section className="card rise">
+    <section className="card trend-card">
       <div className="card-head">
         <div>
           <h2>Net revenue harian</h2>
-          <p className="secondary small">Geser di grafik untuk memilih rentang tanggal, atau klik satu batang untuk satu hari.</p>
+          <p className="secondary small">Geser di grafik untuk memilih tanggal · klik satu batang untuk satu hari</p>
         </div>
-        <Legend active={channels} />
+        <div className="head-tools">
+          <Legend active={channels} />
+          <span className="legend-line">
+            <span className="line-key ink" />
+            Rata-rata 7 hari
+          </span>
+          <div className="segmented small-seg" role="group" aria-label="Tampilan">
+            <button className={view === 'chart' ? 'active' : ''} aria-pressed={view === 'chart'} onClick={() => setView('chart')}>
+              Grafik
+            </button>
+            <button className={view === 'table' ? 'active' : ''} aria-pressed={view === 'table'} onClick={() => setView('table')}>
+              Tabel
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="trend">
-        <div className="trend-y" aria-hidden>
-          {ticks.map((t) => (
-            <span key={t} style={{ bottom: `${(t / top) * 100}%` }}>
-              {formatCompact(t)}
-            </span>
-          ))}
-        </div>
+      {view === 'chart' ? (
+        <div className="trend">
+          <div className="trend-y" aria-hidden>
+            {ticks.map((t) => (
+              <span key={t} style={{ bottom: `${(t / top) * 100}%` }}>
+                {formatCompact(t)}
+              </span>
+            ))}
+          </div>
 
-        <div
-          ref={plot}
-          className={`trend-plot${drag ? ' dragging' : ''}`}
-          role="img"
-          aria-label="Grafik net revenue harian per channel. Angkanya tersedia di tabel di bawah grafik."
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.currentTarget.setPointerCapture(e.pointerId);
-            const i = indexAt(e.clientX);
-            setDrag({ start: i, end: i });
-          }}
-          onPointerMove={(e) => {
-            const i = indexAt(e.clientX);
-            setHover(i);
-            if (drag && drag.end !== i) setDrag({ ...drag, end: i });
-          }}
-          onPointerUp={finishDrag}
-          onPointerCancel={() => setDrag(null)}
-          onPointerLeave={() => !drag && setHover(null)}
-        >
-          {ticks.map((t) => (
-            <div key={t} className={`gridline${t === 0 ? ' base' : ''}`} style={{ bottom: `${(t / top) * 100}%` }} />
-          ))}
+          <div
+            ref={plot}
+            className={`trend-plot${drag ? ' dragging' : ''}`}
+            role="img"
+            aria-label="Grafik net revenue harian per channel. Angkanya tersedia di tampilan tabel."
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              const i = indexAt(e.clientX);
+              setDrag({ start: i, end: i });
+            }}
+            onPointerMove={(e) => {
+              const i = indexAt(e.clientX);
+              setHover(i);
+              if (drag && drag.end !== i) setDrag({ ...drag, end: i });
+            }}
+            onPointerUp={finishDrag}
+            onPointerCancel={() => setDrag(null)}
+            onPointerLeave={() => !drag && setHover(null)}
+          >
+            {ticks.map((t) => (
+              <div key={t} className={`gridline${t === 0 ? ' base' : ''}`} style={{ bottom: `${(t / top) * 100}%` }} />
+            ))}
 
-          {band && (
-            <div
-              className={`band${drag ? ' live' : ''}`}
-              style={{ left: `${(band[0] / n) * 100}%`, width: `${((band[1] - band[0] + 1) / n) * 100}%` }}
-            >
-              {drag && (
-                <span className="band-label">
-                  {band[0] === band[1]
-                    ? formatDay(points[band[0]].day)
-                    : `${formatDay(points[band[0]].day)} – ${formatDay(points[band[1]].day)}`}
-                </span>
-              )}
-            </div>
-          )}
+            {band && (
+              <div
+                className={`band${drag ? ' live' : ''}`}
+                style={{ left: `${(band[0] / n) * 100}%`, width: `${((band[1] - band[0] + 1) / n) * 100}%` }}
+              >
+                {drag && (
+                  <span className="band-label">
+                    {band[0] === band[1]
+                      ? formatDay(points[band[0]].day)
+                      : `${formatDay(points[band[0]].day)} – ${formatDay(points[band[1]].day)}`}
+                  </span>
+                )}
+              </div>
+            )}
 
-          <div className="trend-cols" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
-            {points.map((p, i) => {
-              const dim = drag ? i < band![0] || i > band![1] : hasRange && !inRange(p.day);
-              return (
-                <div key={p.day} className={`trend-col${dim ? ' dim' : ''}${hover === i && !drag ? ' hover' : ''}`}>
-                  <div className="trend-stack" style={{ height: `${(p.total / top) * 100}%` }}>
-                    {shown.map((c) =>
-                      p.byChannel[c] > 0 ? (
-                        <div key={c} className="seg" style={{ flexGrow: p.byChannel[c], background: CHANNEL_COLOR[c] }} />
-                      ) : null,
-                    )}
+            <div className="trend-cols" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
+              {points.map((p, i) => {
+                const dim = drag ? i < band![0] || i > band![1] : hasRange && !inRange(p.day);
+                return (
+                  <div key={p.day} className={`trend-col${dim ? ' dim' : ''}${hover === i && !drag ? ' hover' : ''}`}>
+                    <div className="trend-stack" style={{ height: `${(p.total / top) * 100}%`, '--i': i } as CSSProperties}>
+                      {shown.map((c) =>
+                        p.byChannel[c] > 0 ? (
+                          <div key={c} className="seg" style={{ flexGrow: p.byChannel[c], background: CHANNEL_COLOR[c] }} />
+                        ) : null,
+                      )}
+                    </div>
                   </div>
-                </div>
+                );
+              })}
+            </div>
+
+            {averageLine && (
+              <svg className="trend-line" viewBox={`0 0 ${n} 100`} preserveAspectRatio="none" aria-hidden>
+                <polyline className="halo" points={averageLine} vectorEffect="non-scaling-stroke" />
+                <polyline points={averageLine} vectorEffect="non-scaling-stroke" />
+              </svg>
+            )}
+
+            {n > 0 && points[peak].total > 0 && !drag && (
+              <div className="peak" style={{ left: `${((peak + 0.5) / n) * 100}%`, bottom: `${(points[peak].total / top) * 100}%` }}>
+                Tertinggi · {formatDay(points[peak].day)} · {formatCompact(points[peak].total)}
+              </div>
+            )}
+
+            {hovered && (
+              <div className={`tooltip ${align}`} style={{ left: `${((hover! + 0.5) / n) * 100}%` }}>
+                <p className="tooltip-title">{formatDayLong(hovered.day)}</p>
+                {shown.map((c) => (
+                  <p key={c} className="tooltip-row">
+                    <span className="line-key" style={{ background: CHANNEL_COLOR[c] }} />
+                    <span className="tooltip-value">{formatRupiah(hovered.byChannel[c])}</span>
+                    <span className="tooltip-label">{c}</span>
+                  </p>
+                ))}
+                <p className="tooltip-row total">
+                  <span className="line-key blank" />
+                  <span className="tooltip-value">{formatRupiah(hovered.total)}</span>
+                  <span className="tooltip-label">Total</span>
+                </p>
+                {average[hover!] !== null && (
+                  <p className="tooltip-row">
+                    <span className="line-key ink" />
+                    <span className="tooltip-value">{formatRupiah(Math.round(average[hover!]!))}</span>
+                    <span className="tooltip-label">Rata-rata 7 hari</span>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="trend-x" aria-hidden style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
+            {points.map((p, i) => {
+              const d = Number(p.day.slice(8));
+              const major = i === 0 || d === 1 || d % 10 === 0;
+              const minor = d % 5 === 0;
+              return (
+                <span key={p.day} className={major ? 'major' : minor ? 'minor' : ''}>
+                  {major || minor ? (i === 0 || d === 1 ? `${d} ${monthName(p.day)}` : d) : ''}
+                </span>
               );
             })}
           </div>
-
-          {hovered && (
-            <div className={`tooltip ${align}`} style={{ left: `${((hover! + 0.5) / n) * 100}%` }}>
-              <p className="tooltip-title">{formatDayLong(hovered.day)}</p>
-              {shown.map((c) => (
-                <p key={c} className="tooltip-row">
-                  <span className="line-key" style={{ background: CHANNEL_COLOR[c] }} />
-                  <span className="tooltip-value">{formatRupiah(hovered.byChannel[c])}</span>
-                  <span className="tooltip-label">{c}</span>
-                </p>
-              ))}
-              <p className="tooltip-row total">
-                <span className="line-key blank" />
-                <span className="tooltip-value">{formatRupiah(hovered.total)}</span>
-                <span className="tooltip-label">Total</span>
-              </p>
-            </div>
-          )}
         </div>
-
-        <div className="trend-x" aria-hidden style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
-          {points.map((p, i) => {
-            const d = Number(p.day.slice(8));
-            const major = i === 0 || d === 1 || d % 10 === 0;
-            const minor = d % 5 === 0;
-            return (
-              <span key={p.day} className={major ? 'major' : minor ? 'minor' : ''}>
-                {major || minor ? (i === 0 || d === 1 ? `${d} ${monthName(p.day)}` : d) : ''}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-
-      <details>
-        <summary>Lihat angka harian sebagai tabel</summary>
-        <div className="table-wrap">
+      ) : (
+        <div className="scroll-area">
           <table>
             <thead>
               <tr>
@@ -201,7 +243,7 @@ export function TrendChart({ points, from, to, channels, onSelect }: Props) {
             </tbody>
           </table>
         </div>
-      </details>
+      )}
     </section>
   );
 }

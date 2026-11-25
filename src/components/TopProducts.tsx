@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { formatNumber, formatRupiah } from '../lib/format';
 import type { ProductSummary } from '../lib/metrics';
 import { CHANNELS } from '../lib/types';
@@ -19,11 +20,11 @@ export function TopProducts({ products, channels, selected, onSelect }: Props) {
   const shown = CHANNELS.filter((c) => channels.includes(c));
 
   return (
-    <section className="card rise">
+    <section className="card fill-card">
       <div className="card-head">
         <div>
           <h2>Top 10 produk</h2>
-          <p className="secondary small">Berdasarkan net revenue. Klik produk untuk memfilter dashboard.</p>
+          <p className="secondary small">Berdasarkan net revenue · klik untuk memfilter</p>
         </div>
         <Legend active={channels} />
       </div>
@@ -31,6 +32,7 @@ export function TopProducts({ products, channels, selected, onSelect }: Props) {
       {top.length === 0 ? (
         <p className="secondary">Tidak ada penjualan pada filter ini.</p>
       ) : (
+        <div className="scroll-area">
         <ol className="rank">
           {top.map((p, i) => {
             const isSelected = selected === p.key;
@@ -53,22 +55,24 @@ export function TopProducts({ products, channels, selected, onSelect }: Props) {
                       </span>
                       <span className="rank-value">{formatRupiah(p.netRevenue)}</span>
                     </span>
-                    <span className="hbar-track">
-                      <span className="hbar stack" style={{ width: `${(p.netRevenue / max) * 100}%` }}>
-                        {shown.map((c) =>
-                          p.byChannel[c] > 0 ? (
-                            <span key={c} style={{ flexGrow: p.byChannel[c], background: CHANNEL_COLOR[c] }} />
-                          ) : null,
-                        )}
+                    <span className="rank-bar">
+                      <span className="hbar-track">
+                        <span className="hbar stack" style={{ width: `${(p.netRevenue / max) * 100}%`, '--i': i } as CSSProperties}>
+                          {shown.map((c) =>
+                            p.byChannel[c] > 0 ? (
+                              <span key={c} style={{ flexGrow: p.byChannel[c], background: CHANNEL_COLOR[c] }} />
+                            ) : null,
+                          )}
+                        </span>
                       </span>
-                    </span>
-                    <span className="secondary small">
-                      {p.sku || 'SKU tidak diketahui'} · {formatNumber(p.units)} unit
+                      <span className="rank-units">{formatNumber(p.units)} unit</span>
                     </span>
                   </span>
                   {hover === p.key && (
-                    <span className="tooltip rank-tooltip" role="tooltip">
-                      <span className="tooltip-title">{p.name}</span>
+                    <span className={`tooltip rank-tooltip${i >= 5 ? ' up' : ''}`} role="tooltip">
+                      <span className="tooltip-title">
+                        {p.name} · {p.sku || 'SKU tidak diketahui'}
+                      </span>
                       {shown.map((c) => (
                         <span key={c} className="tooltip-row">
                           <span className="line-key" style={{ background: CHANNEL_COLOR[c] }} />
@@ -88,6 +92,7 @@ export function TopProducts({ products, channels, selected, onSelect }: Props) {
             );
           })}
         </ol>
+        </div>
       )}
     </section>
   );

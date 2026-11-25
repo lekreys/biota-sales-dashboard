@@ -34,13 +34,25 @@ export interface RejectedRow {
   reason: string;
 }
 
+/** One raw format found in the files, e.g. dates written as "DD/MM/YYYY HH:mm:ss". */
+export interface FormatStat {
+  field: 'date' | 'money';
+  format: string;
+  example: string; // first raw value seen in this format
+  count: number; // values (dates: one per row; money: unit_price and total_price)
+  channels: Channel[];
+}
+
 export interface CleanResult {
   rows: CleanRow[];
   rowsRead: number;
   rejected: RejectedRow[];
   duplicatesRemoved: number;
+  duplicateValue: number; // total_price of removed duplicates that would have been counted
   skuMissing: number;
   skuRecovered: number;
   priceMismatches: number; // qty x unit_price != total_price (total_price is used)
   productNames: Record<string, string>; // product key -> display name
+  formats: FormatStat[];
+  channelSpellings: { raw: string; channel: Channel; count: number }[];
 }

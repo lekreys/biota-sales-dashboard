@@ -1,35 +1,11 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import type { SourceFile } from '../lib/types';
+import { CloseIcon, FileIcon, UploadIcon } from './Icons';
 
-interface Props {
-  files: SourceFile[];
-  errors: string[];
-  onFiles: (files: File[]) => void;
-  onSample: () => void;
-  onReset: () => void;
-}
-
-export function UploadArea({ files, errors, onFiles, onSample, onReset }: Props) {
-  const input = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const loaded = files.length > 0;
-
-  const dropHandlers = {
-    onDragOver: (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragging(true);
-    },
-    onDragLeave: () => setDragging(false),
-    onDrop: (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragging(false);
-      onFiles([...e.dataTransfer.files]);
-    },
-  };
-
-  const fileInput = (
+function FileInput({ inputRef, onFiles }: { inputRef: React.RefObject<HTMLInputElement>; onFiles: (f: File[]) => void }) {
+  return (
     <input
-      ref={input}
+      ref={inputRef}
       type="file"
       accept=".csv,text/csv"
       multiple
@@ -40,59 +16,32 @@ export function UploadArea({ files, errors, onFiles, onSample, onReset }: Props)
       }}
     />
   );
+}
 
-  const errorList = errors.length > 0 && (
-    <ul className="alert" role="alert">
-      {errors.map((e) => (
-        <li key={e}>{e}</li>
-      ))}
-    </ul>
-  );
-
-  if (loaded) {
-    return (
-      <section className={`card upload-bar${dragging ? ' dragging' : ''}`} {...dropHandlers}>
-        <div className="file-list">
-          {files.map((f) => (
-            <span className="chip" key={f.name}>
-              {f.name} · {f.rows.length} baris
-            </span>
-          ))}
-        </div>
-        <div className="upload-actions">
-          <button className="button secondary small-button" onClick={() => input.current?.click()}>
-            + Tambah CSV
-          </button>
-          <button className="link" onClick={onReset}>
-            Hapus semua
-          </button>
-        </div>
-        {fileInput}
-        {errorList}
-      </section>
-    );
-  }
-
+/** First screen, before any data: what the app does + where to drop the CSV. */
+export function EmptyState({ onFiles, onSample }: { onFiles: (f: File[]) => void; onSample: () => void }) {
+  const input = useRef<HTMLInputElement>(null);
   return (
-    <section className="card upload-hero rise">
-      <div className="upload-copy">
-        <h2 className="upload-title">Ubah ekspor marketplace jadi angka yang bisa dipercaya</h2>
+    <section className="empty">
+      <div className="empty-copy">
+        <h1>Ekspor marketplace jadi angka yang bisa dipercaya.</h1>
         <ol className="steps">
           <li>
             <span>1</span>Upload CSV dari Shopee, TikTok Shop dan Tokopedia
           </li>
           <li>
-            <span>2</span>Data dibersihkan otomatis: format, duplikat, SKU kosong, status
+            <span>2</span>Format, duplikat, SKU kosong dan status dibersihkan otomatis
           </li>
           <li>
-            <span>3</span>Jelajahi net revenue per channel, produk dan tanggal
+            <span>3</span>Lihat net revenue per channel, produk dan tanggal
           </li>
         </ol>
+        <p className="secondary small">File diproses di browser kamu dan tidak dikirim ke server mana pun.</p>
       </div>
-      <div className={`dropzone${dragging ? ' dragging' : ''}`} {...dropHandlers}>
-        <p className="dropzone-icon" aria-hidden>
-          ⤓
-        </p>
+      <div className="dropzone">
+        <span className="dropzone-icon">
+          <UploadIcon />
+        </span>
         <p className="dropzone-title">Tarik file CSV ke sini</p>
         <p className="secondary small">Satu file gabungan atau beberapa file sekaligus</p>
         <div className="actions">
@@ -103,9 +52,30 @@ export function UploadArea({ files, errors, onFiles, onSample, onReset }: Props)
             Pakai data contoh (Okt 2026)
           </button>
         </div>
-        {fileInput}
+        <FileInput inputRef={input} onFiles={onFiles} />
       </div>
-      {errorList}
     </section>
+  );
+}
+
+/** Compact file controls in the top bar once data is loaded. */
+export function FileActions({ files, onFiles, onReset }: { files: SourceFile[]; onFiles: (f: File[]) => void; onReset: () => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const rows = files.reduce((a, f) => a + f.rows.length, 0);
+  return (
+    <div className="file-actions">
+      <span className="file-chip" title={files.map((f) => `${f.name} (${f.rows.length} baris)`).join('\n')}>
+        <FileIcon />
+        <span className="file-name">{files.length === 1 ? files[0].name : `${files.length} file`}</span>
+        <span className="muted">· {rows} baris</span>
+      </span>
+      <button className="icon-button" onClick={() => input.current?.click()} title="Tambah CSV" aria-label="Tambah file CSV">
+        <UploadIcon />
+      </button>
+      <button className="icon-button" onClick={onReset} title="Hapus semua data" aria-label="Hapus semua data">
+        <CloseIcon />
+      </button>
+      <FileInput inputRef={input} onFiles={onFiles} />
+    </div>
   );
 }
