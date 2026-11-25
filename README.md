@@ -91,7 +91,11 @@ File dari tiga marketplace ditulis dengan cara berbeda-beda. Ini yang dilakukan 
 | Claude Code (ekstensi VS Code) | Claude Opus 5.5 (`claude-opus-5-5`) | Diskusi keputusan data, menulis kode, membuat pengecekan angka, mengecek tampilan, menulis README |
 | VS Code | — | Mengedit dan menjalankan aplikasi di komputer |
 
-Log semua prompt, berurutan dan tanpa diedit, ada di [`prompt-log/`](prompt-log/).
+Log prompt ada di folder [`prompt-log/`](prompt-log/), berurutan dan tanpa diedit:
+
+- [`claude-code-prompts.md`](prompt-log/claude-code-prompts.md): semua prompt saya.
+- [`claude-code-conversation.md`](prompt-log/claude-code-conversation.md): percakapan lengkap, termasuk balasan Claude
+  dan setiap aksi yang dijalankannya.
 
 ---
 
