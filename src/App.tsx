@@ -29,8 +29,6 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
-const SAMPLE_FILE = 'biota_orders_oct2026.csv';
-
 const hasFiles = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
 
 export default function App() {
@@ -53,11 +51,6 @@ export default function App() {
     setErrors(problems);
     if (added.length === 0) return;
     setFiles((current) => [...current.filter((file) => !added.some((a) => a.name === file.name)), ...added]);
-  }
-
-  async function loadSample() {
-    const { default: text } = await import('../data/biota_orders_oct2026.csv?raw');
-    await addFiles([{ name: SAMPLE_FILE, text: async () => text }]);
   }
 
   function reset() {
@@ -143,7 +136,7 @@ export default function App() {
 
       <main className="main">
         {!dashboard || !cleaned ? (
-          <EmptyState onFiles={addFiles} onSample={loadSample} />
+          <EmptyState onFiles={addFiles} />
         ) : (
           <div
             className={`panel panel-${tab}`}

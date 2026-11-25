@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cleanRows } from './clean';
@@ -39,13 +39,18 @@ function runPython(): PythonResult | null {
   }
 }
 
-const python = runPython();
+const hasData = existsSync(csvPath);
+const python = hasData ? runPython() : null;
 
-describe.skipIf(python === null)('dashboard numbers = independent Python implementation', () => {
+function loadCleaned() {
   const csv = readCsv(readFileSync(csvPath, 'utf-8'));
   if (!csv.ok) throw new Error(csv.error);
-  const cleaned = cleanRows([{ name: 'oct.csv', rows: csv.rows }]);
+  return cleanRows([{ name: 'oct.csv', rows: csv.rows }]);
+}
 
+const cleaned = python ? loadCleaned() : null!;
+
+describe.skipIf(python === null)('dashboard numbers = independent Python implementation', () => {
   it('file cleaning counts and statuses', () => {
     const { file } = buildDashboard(cleaned, python!.scenarios[0].filter)!;
     expect({

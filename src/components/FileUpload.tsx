@@ -19,7 +19,7 @@ function FileInput({ inputRef, onFiles }: { inputRef: RefObject<HTMLInputElement
   );
 }
 
-export function EmptyState({ onFiles, onSample }: { onFiles: (files: File[]) => void; onSample: () => void }) {
+export function EmptyState({ onFiles }: { onFiles: (files: File[]) => void }) {
   const input = useRef<HTMLInputElement>(null);
 
   return (
@@ -49,9 +49,6 @@ export function EmptyState({ onFiles, onSample }: { onFiles: (files: File[]) => 
         <div className="actions">
           <button className="button" onClick={() => input.current?.click()}>
             Pilih file CSV
-          </button>
-          <button className="button secondary" onClick={onSample}>
-            Pakai data contoh (Okt 2026)
           </button>
         </div>
         <FileInput inputRef={input} onFiles={onFiles} />

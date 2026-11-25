@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cleanRows } from './clean';
@@ -6,15 +6,22 @@ import { readCsv } from './csv';
 import { buildDashboard, NO_FILTERS } from './metrics';
 import type { Filters } from './metrics';
 
-const csv = readCsv(readFileSync(resolve(__dirname, '../../data/biota_orders_oct2026.csv'), 'utf-8'));
-if (!csv.ok) throw new Error(csv.error);
-const cleaned = cleanRows([{ name: 'biota_orders_oct2026.csv', rows: csv.rows }]);
+const csvPath = resolve(__dirname, '../../data/biota_orders_oct2026.csv');
+const hasData = existsSync(csvPath);
+
+function loadCleaned() {
+  const csv = readCsv(readFileSync(csvPath, 'utf-8'));
+  if (!csv.ok) throw new Error(csv.error);
+  return cleanRows([{ name: 'biota_orders_oct2026.csv', rows: csv.rows }]);
+}
+
+const cleaned = hasData ? loadCleaned() : null!;
 
 const dashboard = (filters: Partial<Filters> = {}) => buildDashboard(cleaned, { ...NO_FILTERS, ...filters })!;
 const netByChannel = (filters: Partial<Filters> = {}) =>
   Object.fromEntries(dashboard(filters).channels.map((c) => [c.channel, c.netRevenue]));
 
-describe('October 2026 export', () => {
+describe.skipIf(!hasData)('October 2026 export', () => {
   it('cleans the file as expected', () => {
     expect(cleaned.rowsRead).toBe(495);
     expect(cleaned.rejected).toEqual([]);

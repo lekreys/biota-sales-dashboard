@@ -20,8 +20,8 @@ tetap dihitung.
 ## Cara memakai
 
 1. Buka link di atas.
-2. Klik **Pilih file CSV** dan pilih file ekspor. Boleh satu file gabungan atau beberapa file sekaligus.
-   Untuk mencoba tanpa file, klik **Pakai data contoh**.
+2. Klik **Pilih file CSV** dan pilih file ekspor (misalnya `biota_orders_oct2026.csv`), atau tarik file ke halaman.
+   Boleh satu file gabungan atau beberapa file sekaligus.
 3. Lihat hasilnya di tiga tab:
    - **Ringkasan:** total penjualan, grafik per hari, dan penjualan per marketplace.
    - **Produk:** 10 produk terlaris dan daftar semua produk.
@@ -30,7 +30,8 @@ tetap dihitung.
    Bisa juga dengan menarik (drag) mouse di grafik harian.
 5. Klik nama marketplace atau nama produk untuk melihat angkanya saja.
 
-File diproses langsung di browser dan tidak dikirim ke mana pun.
+File diproses langsung di browser dan tidak dikirim ke mana pun. File data juga tidak disimpan di repo ini, karena
+brief meminta data tidak disebarkan.
 
 ## Keputusan tentang data
 
@@ -60,8 +61,8 @@ File dari tiga marketplace ditulis dengan cara berbeda-beda. Ini yang dilakukan 
 - Semua angka dihitung **dua kali dengan dua cara yang terpisah**, dan hasilnya harus sama persis. Ini dicek untuk
   8 kombinasi filter (seluruh bulan, 1–15 Okt, satu hari, satu marketplace, satu produk, dan lainnya).
 - Angka yang benar-benar tampil di layar juga dibaca ulang secara otomatis: 310 angka, semuanya cocok.
-- Pengecekan ini berjalan otomatis setiap kali aplikasi diperbarui. Kalau ada satu angka yang beda, versi baru
-  tidak akan dipasang.
+- Pengecekan ini dijalankan dengan file data asli di komputer (`npm test`). Karena file data tidak disimpan di repo,
+  GitHub hanya menjalankan test yang tidak butuh data asli.
 
 ## Tiga kesalahan AI dan cara memperbaikinya
 
@@ -106,6 +107,9 @@ npm run lint     # cek format kode (Prettier) dan tipe (TypeScript)
 npm run format   # rapikan format kode
 npm run verify   # hitung ulang angka dengan Python (butuh python3)
 ```
+
+Untuk test angka akhir dan cek silang dengan Python, taruh `biota_orders_oct2026.csv` di folder `data/` (file ini
+sengaja tidak ikut di repo). Tanpa file itu, test tersebut otomatis dilewati.
 
 Logika data ada di `src/lib/` (membaca file, merapikan, menghitung). Tampilan ada di `src/components/`.
 Hitungan kedua yang terpisah ada di `scripts/verify_numbers.py`. Setiap push ke `main` menjalankan semua test di
