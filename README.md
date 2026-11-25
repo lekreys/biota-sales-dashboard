@@ -52,6 +52,8 @@ File dari tiga marketplace ditulis dengan cara berbeda-beda. Ini yang dilakukan 
   produknya.
 - **Biaya marketplace, voucher dan ongkir** tidak ada di file, jadi net revenue ini belum dipotong biaya-biaya itu.
 - **Kota pembeli** kadang berbeda di dalam satu pesanan yang sama. Kolom ini tidak dipakai untuk menghitung apa pun.
+- **Status baru** yang belum dikenal (misalnya dari ekspor bulan depan) tidak pernah dihitung diam-diam. Status itu
+  muncul sebagai peringatan di tab Data supaya bisa diputuskan dulu.
 
 ## Bagaimana angkanya dipastikan benar
 
@@ -83,12 +85,12 @@ File dari tiga marketplace ditulis dengan cara berbeda-beda. Ini yang dilakukan 
 
 ## Tools AI yang dipakai
 
-| Tool | Model AI | Dipakai untuk |
+| Tool | Nama dan versi model AI | Dipakai untuk |
 |---|---|---|
-| Claude Code (di VS Code) | Claude Opus 5.5 | Diskusi keputusan data, menulis kode, membuat pengecekan angka, mengecek tampilan, menulis README |
+| Claude Code (ekstensi VS Code) | Claude Opus 5.5 (`claude-opus-5-5`) | Diskusi keputusan data, menulis kode, membuat pengecekan angka, mengecek tampilan, menulis README |
 | VS Code | — | Mengedit dan menjalankan aplikasi di komputer |
 
-Log semua prompt ada di folder `prompt-log/`.
+Log semua prompt, berurutan dan tanpa diedit, ada di [`prompt-log/`](prompt-log/).
 
 ---
 
@@ -106,5 +108,5 @@ npm run verify   # hitung ulang angka dengan Python (butuh python3)
 ```
 
 Logika data ada di `src/lib/` (membaca file, merapikan, menghitung). Tampilan ada di `src/components/`.
-Hitungan kedua yang terpisah ada di `scripts/verify_numbers.py`. Setiap push ke `main` menjalankan semua test lalu
-memasang aplikasi ke GitHub Pages.
+Hitungan kedua yang terpisah ada di `scripts/verify_numbers.py`. Setiap push ke `main` menjalankan semua test di
+GitHub Actions. Pengaturan hosting ada di `vercel.json` (build `npm run build`, folder `dist`).
